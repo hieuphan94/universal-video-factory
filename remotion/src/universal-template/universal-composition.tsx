@@ -1,6 +1,6 @@
 import React from "react";
 import { useVideoConfig, Sequence } from "remotion";
-import { SceneSequencer } from "./scene-sequencer";
+import { ContinuousScreen } from "../components/screen-clip";
 import { AudioLayer } from "../components/audio-layer";
 import { KaraokeSubtitles } from "../components/karaoke-subtitles";
 import { ClickHighlight } from "../components/click-highlight";
@@ -42,15 +42,8 @@ export const UniversalComposition: React.FC<UniversalTemplateProps> = ({
   const contentEnd = durationInFrames - outroDuration;
   const contentDuration = Math.max(1, contentEnd - contentStart);
 
-  // Scenes & zoom events have frame numbers relative to content start —
-  // offset them so they align inside the content Sequence.
-  const offsetScenes = scenes.map((s) => ({
-    ...s,
-    startFrame: s.startFrame,
-  }));
-
-  // Zoom events are already relative to content; pass through as-is
-  // (ZoomContainer reads useCurrentFrame which resets inside <Sequence>)
+  // All scenes share one continuous video — use the first scene's videoPath
+  const continuousVideoPath = scenes.length > 0 ? scenes[0].videoPath : "";
 
   // Feature title: derive from first scene id or fallback
   const featureTitle =
@@ -87,8 +80,8 @@ export const UniversalComposition: React.FC<UniversalTemplateProps> = ({
           name="content"
         >
           <ZoomContainer zoomEvents={zoomEvents}>
-            <SceneSequencer
-              scenes={offsetScenes}
+            <ContinuousScreen
+              videoPath={continuousVideoPath}
               width={width}
               height={height}
             />

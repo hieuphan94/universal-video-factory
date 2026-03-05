@@ -1,19 +1,23 @@
 import React from "react";
 import { OffthreadVideo } from "remotion";
-import type { SceneProps } from "../universal-template/props-schema";
 
-interface ScreenClipProps {
-  scene: SceneProps;
+interface ContinuousScreenProps {
+  /** Path to the single continuous recording video */
+  videoPath: string;
   width: number;
   height: number;
 }
 
 /**
- * Renders a single screen recording clip using OffthreadVideo.
- * Must be wrapped in a <Sequence> by the parent (scene-sequencer).
- * OffthreadVideo is preferred over Video for memory efficiency during render.
+ * Renders the continuous screen recording as a single uninterrupted video.
+ * No scene cuts — the video plays straight through for the entire content duration.
+ * Scene boundaries are handled by overlay layers (subtitles, step counter, etc).
  */
-export const ScreenClip: React.FC<ScreenClipProps> = ({ scene, width, height }) => {
+export const ContinuousScreen: React.FC<ContinuousScreenProps> = ({
+  videoPath,
+  width,
+  height,
+}) => {
   return (
     <div
       style={{
@@ -27,7 +31,7 @@ export const ScreenClip: React.FC<ScreenClipProps> = ({ scene, width, height }) 
       }}
     >
       <OffthreadVideo
-        src={scene.videoPath}
+        src={videoPath}
         style={{
           width: "100%",
           height: "100%",

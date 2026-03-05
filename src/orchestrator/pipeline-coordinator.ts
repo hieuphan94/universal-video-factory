@@ -281,16 +281,22 @@ export class PipelineCoordinator {
       viewportHeight: this.buildBrowserConfig().viewportHeight,
       fps: this.buildBrowserConfig().recordingFps,
       totalScenes: results.length,
-      scenes: results.map((r, i) => ({
-        index: r.sceneIndex,
-        videoFile: path.basename(r.videoPath),
-        durationMs: r.durationMs,
-        clickX: clickPlan.actions[i]?.x ?? 0,
-        clickY: clickPlan.actions[i]?.y ?? 0,
-        actionDescription: clickPlan.actions[i]?.description ?? "",
-        usedFallback: clickPlan.actions[i]?.useFallback ?? false,
-        cursorEvents: [],
-      })),
+      // All scenes share one continuous video file — compute per-scene time offsets
+      scenes: results.map((r, i) => {
+        // Calculate scene start offset by summing durations of preceding scenes
+        const offsetMs = results.slice(0, i).reduce((sum, prev) => sum + prev.durationMs, 0);
+        return {
+          index: r.sceneIndex,
+          videoFile: r.videoPath ? path.basename(r.videoPath) : `scene-${String(r.sceneIndex).padStart(2, "0")}.mp4`,
+          durationMs: r.durationMs,
+          offsetMs,
+          clickX: clickPlan.actions[i]?.x ?? 0,
+          clickY: clickPlan.actions[i]?.y ?? 0,
+          actionDescription: clickPlan.actions[i]?.description ?? "",
+          usedFallback: clickPlan.actions[i]?.useFallback ?? false,
+          cursorEvents: [],
+        };
+      }),
     };
 
     await fs.writeFile(captureResult.metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
