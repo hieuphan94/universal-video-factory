@@ -7,7 +7,7 @@
     "video-factory": "./dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && cd src/dashboard && npm run build",
     "dev": "tsx src/cli/index.ts",
     "typecheck": "tsc --noEmit",
     "start": "node dist/cli/index.js",

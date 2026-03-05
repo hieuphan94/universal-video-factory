@@ -142,6 +142,31 @@ Create a `brand.json` to customize video appearance:
 - **Intro/Outro** — brand-driven animations
 - **Progress bar** + step counter overlay
 
+## Web Dashboard
+
+A browser-based UI for managing video generation jobs with real-time progress.
+
+```bash
+# Start the dashboard server
+video-factory serve --port=3456
+
+# Development mode
+npm run dev -- serve --port=3456
+```
+
+Open http://localhost:3456 to access the dashboard. Features:
+- Create and manage video generation jobs
+- Real-time pipeline progress via WebSocket
+- Live log streaming
+- Video preview for completed jobs
+
+For dashboard UI development, run the Vite dev server alongside the API:
+
+```bash
+npm run dev -- serve          # API server on :3456
+npm run dashboard:dev         # Vite dev server on :5173 (proxies to API)
+```
+
 ## Project Structure
 
 ```
@@ -150,23 +175,30 @@ src/
 ├── capture/         — Playwright browser recording, scene capture, manual mode
 ├── cli/             — CLI entry point, argument parsing, progress display
 ├── compositor/      — Brand loading, scene timing, Remotion render engine
+├── dashboard/       — React web UI (Vite + TypeScript)
 ├── export/          — FFmpeg HEVC export, webm→mp4 conversion
 ├── orchestrator/    — Pipeline coordinator, checkpoints, error handling
+├── queue/           — SQLite job store, runner, worker
+├── server/          — Hono API server, WebSocket hub, job routes
 └── utils/           — Retry, logger, cleanup utilities
 
 remotion/src/
 ├── components/      — Click highlight, zoom, karaoke subs, intro/outro, PiP
 └── universal-template/  — Main composition, props schema, scene sequencer
+
+docs/                — Project documentation (architecture, code standards, etc.)
 ```
 
 ## Development
 
 ```bash
 npm run dev          # Run CLI in development mode
-npm run build        # Build with tsup
+npm run build        # Build CLI + dashboard
 npm run typecheck    # TypeScript type checking
 npm test             # Run unit tests
 npm run test:watch   # Watch mode
+npm run dashboard:dev    # Dashboard Vite dev server
+npm run dashboard:build  # Build dashboard only
 ```
 
 ## Troubleshooting
