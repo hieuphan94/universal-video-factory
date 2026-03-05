@@ -14,7 +14,6 @@ interface IntroSequenceProps {
   duration: number;
 }
 
-const FPS = 30;
 const SPRING_CFG = { damping: 18, stiffness: 160 };
 
 /**
@@ -35,7 +34,7 @@ export const IntroSequence: React.FC<IntroSequenceProps> = ({
   duration,
 }) => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
+  const { width, height, fps } = useVideoConfig();
 
   const primaryColor = brand?.colors.primary ?? "#1a1a2e";
   const accentColor = brand?.colors.accent ?? "#FFD700";
@@ -49,7 +48,7 @@ export const IntroSequence: React.FC<IntroSequenceProps> = ({
 
   // Logo: scale + fade, frames 15-45 (relative frame inside <Sequence>)
   const logoScale = spring({
-    fps: FPS,
+    fps,
     frame: Math.max(0, frame - 15),
     config: SPRING_CFG,
     durationInFrames: 30,

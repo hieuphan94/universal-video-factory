@@ -21,7 +21,6 @@ interface ZoomContainerProps {
 
 const MAX_SCALE = 2.0;
 const SPRING_CFG = { damping: 20, stiffness: 120 };
-const FPS = 30;
 
 /**
  * Wraps scene content with spring-animated zoom keyed to click events.
@@ -39,7 +38,7 @@ export const ZoomContainer: React.FC<ZoomContainerProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
+  const { width, height, fps } = useVideoConfig();
 
   // Compute combined scale and origin from all active zoom events
   let currentScale = 1.0;
@@ -60,7 +59,7 @@ export const ZoomContainer: React.FC<ZoomContainerProps> = ({
     if (relFrame <= 15) {
       // Zoom in phase
       const progress = spring({
-        fps: FPS,
+        fps,
         frame: relFrame,
         config: SPRING_CFG,
         durationInFrames: 15,
@@ -73,7 +72,7 @@ export const ZoomContainer: React.FC<ZoomContainerProps> = ({
       // Zoom out phase
       const outFrame = relFrame - (15 + event.duration);
       const progress = spring({
-        fps: FPS,
+        fps,
         frame: outFrame,
         config: SPRING_CFG,
         durationInFrames: 15,

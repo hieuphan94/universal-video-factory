@@ -1,5 +1,5 @@
 import React from "react";
-import { useCurrentFrame, interpolate, spring } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate, spring } from "remotion";
 
 interface ClickHighlightProps {
   /** X coordinate in pixels (relative to composition width) */
@@ -31,12 +31,11 @@ export const ClickHighlight: React.FC<ClickHighlightProps> = ({
   size = 40,
 }) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
   const relativeFrame = frame - startFrame;
 
   // Only render during the highlight's lifetime
   if (relativeFrame < 0 || relativeFrame > 21) return null;
-
-  const fps = 30;
 
   // Spring expansion: frames 0-9
   const expandProgress = spring({

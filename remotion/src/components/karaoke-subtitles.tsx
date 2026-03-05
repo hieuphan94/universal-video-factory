@@ -74,7 +74,6 @@ export const KaraokeSubtitles: React.FC<KaraokeSubtitlesProps> = ({
                 color: isActive ? "#FFD700" : "#FFFFFF",
                 textShadow: "1px 1px 3px rgba(0,0,0,0.9)",
                 lineHeight: 1.4,
-                transition: "color 0.05s",
               }}
             >
               {w.word}
