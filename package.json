@@ -10,7 +10,9 @@
     "build": "tsup",
     "dev": "tsx src/cli/index.ts",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/cli/index.js"
+    "start": "node dist/cli/index.js",
+    "test": "vitest run --config tests/vitest.config.ts",
+    "test:watch": "vitest --config tests/vitest.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",
@@ -19,13 +21,15 @@
     "@remotion/renderer": "^4.0.432",
     "dotenv": "^16.4.7",
     "playwright": "^1.50.1",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.2",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.13.9",
     "@types/yargs": "^17.0.33",
     "tsup": "^8.4.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^1.0.0"
   }
 }

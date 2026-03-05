@@ -1,0 +1,20 @@
+{
+  "words": [
+    { "word": "Welcome",      "start": 0.00, "end": 0.40 },
+    { "word": "to",           "start": 0.42, "end": 0.55 },
+    { "word": "the",          "start": 0.57, "end": 0.68 },
+    { "word": "app",          "start": 0.70, "end": 0.95 },
+    { "word": "Click",        "start": 1.10, "end": 1.40 },
+    { "word": "the",          "start": 1.42, "end": 1.52 },
+    { "word": "sign",         "start": 1.54, "end": 1.75 },
+    { "word": "up",           "start": 1.77, "end": 1.90 },
+    { "word": "button",       "start": 1.92, "end": 2.20 },
+    { "word": "Enter",        "start": 3.00, "end": 3.35 },
+    { "word": "your",         "start": 3.37, "end": 3.50 },
+    { "word": "email",        "start": 3.52, "end": 3.85 },
+    { "word": "and",          "start": 3.87, "end": 3.97 },
+    { "word": "password",     "start": 3.99, "end": 4.45 }
+  ],
+  "scenes": [],
+  "total_duration": 4.45
+}

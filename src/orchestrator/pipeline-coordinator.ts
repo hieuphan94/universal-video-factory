@@ -11,9 +11,23 @@ import { SceneRecorder } from "../capture/scene-recorder.js";
 import { renderVideo } from "../compositor/render-engine.js";
 import { loadBrand, toRemotion } from "../compositor/brand-loader.js";
 import { convertWebmToMp4, exportFinalVideo } from "../export/ffmpeg-exporter.js";
+import {
+  saveCheckpoint,
+  loadCheckpoint,
+  isPhaseComplete,
+  getPhaseData,
+} from "./checkpoint-manager.js";
+import { handleError } from "./error-handler.js";
+import type { ProgressDisplay } from "../cli/progress-display.js";
 import type { PipelineConfig, CaptureResult, PipelineResult, ExportPhaseResult } from "./types.js";
 import type { DirectorConfig } from "../ai-director/types.js";
 import type { BrowserConfig, CaptureMetadata } from "../capture/types.js";
+
+export interface PipelineRunOptions {
+  resume?: boolean;
+  preview?: boolean;
+  progress?: ProgressDisplay;
+}
 
 interface OutputDirs {
   output: string;
@@ -24,51 +38,107 @@ interface OutputDirs {
 
 export class PipelineCoordinator {
   private config: PipelineConfig;
+  private opts: PipelineRunOptions;
 
-  constructor(config: PipelineConfig) {
+  constructor(config: PipelineConfig, opts: PipelineRunOptions = {}) {
     this.config = config;
+    this.opts = opts;
   }
 
   async run(): Promise<PipelineResult> {
     const startedAt = Date.now();
     console.log(`[Pipeline] Starting for: ${this.config.url} — "${this.config.feature}"`);
 
+    const checkpoint = this.opts.resume
+      ? await loadCheckpoint(this.config.output)
+      : null;
+
+    if (checkpoint && this.opts.resume) {
+      const done = checkpoint.completedPhases.map((p) => p.phase).join(", ");
+      console.log(`[Pipeline] Resuming — already completed: ${done}`);
+    }
+
     try {
       const dirs = await this.createOutputDirs();
 
       // Phase A: AI Director — screenshot → script + click plan
-      const phaseA = Date.now();
-      const captureResult = await this.runAIDirectorPhase(dirs);
-      console.log(`[Pipeline] Phase A done in ${((Date.now() - phaseA) / 1000).toFixed(1)}s`);
+      let captureResult: CaptureResult;
+      if (isPhaseComplete(checkpoint, "A")) {
+        const data = getPhaseData(checkpoint, "A") as { clickPlanPath: string; scriptPath: string; metadataPath: string };
+        console.log("[Pipeline] Phase A: skipped (checkpoint)");
+        captureResult = {
+          scenes: [],
+          scriptPath: data.scriptPath,
+          clickPlanPath: data.clickPlanPath,
+          metadataPath: data.metadataPath,
+          outputDir: dirs.output,
+        };
+      } else {
+        this.opts.progress?.startPhase("A", "AI Director — analyze + script");
+        const phaseA = Date.now();
+        captureResult = await this.runAIDirectorPhase(dirs);
+        await saveCheckpoint(dirs.output, "A", {
+          clickPlanPath: captureResult.clickPlanPath,
+          scriptPath: captureResult.scriptPath,
+          metadataPath: captureResult.metadataPath,
+        });
+        this.opts.progress?.completePhase("A");
+        console.log(`[Pipeline] Phase A done in ${((Date.now() - phaseA) / 1000).toFixed(1)}s`);
+      }
 
       // Phase B: Capture — execute click plan, record scenes
-      const phaseB = Date.now();
-      await this.runCapturePhase(captureResult, dirs);
-      console.log(`[Pipeline] Phase B done in ${((Date.now() - phaseB) / 1000).toFixed(1)}s`);
+      if (!isPhaseComplete(checkpoint, "B")) {
+        this.opts.progress?.startPhase("B", "Capture — recording scenes");
+        const phaseB = Date.now();
+        await this.runCapturePhase(captureResult, dirs);
+        await saveCheckpoint(dirs.output, "B", {});
+        this.opts.progress?.completePhase("B");
+        console.log(`[Pipeline] Phase B done in ${((Date.now() - phaseB) / 1000).toFixed(1)}s`);
+      } else {
+        console.log("[Pipeline] Phase B: skipped (checkpoint)");
+      }
 
       // Phase C: Convert .webm → .mp4 for Remotion
-      const phaseC = Date.now();
-      await this.convertScenesWebmToMp4(dirs);
-      console.log(`[Pipeline] Phase C (webm→mp4) done in ${((Date.now() - phaseC) / 1000).toFixed(1)}s`);
+      if (!isPhaseComplete(checkpoint, "C")) {
+        this.opts.progress?.startPhase("C", "Convert webm to mp4");
+        const phaseC = Date.now();
+        await this.convertScenesWebmToMp4(dirs);
+        await saveCheckpoint(dirs.output, "C", {});
+        this.opts.progress?.completePhase("C");
+        console.log(`[Pipeline] Phase C (webm→mp4) done in ${((Date.now() - phaseC) / 1000).toFixed(1)}s`);
+      } else {
+        console.log("[Pipeline] Phase C: skipped (checkpoint)");
+      }
 
       // Phase D: Remotion compositor → draft.mp4
-      const phaseD = Date.now();
       const draftPath = path.join(dirs.output, "draft.mp4");
-      const brand = await loadBrand(this.config.brand);
-      const remotionBrand = toRemotion(brand);
-
-      await renderVideo({
-        projectDir: dirs.output,
-        outputPath: draftPath,
-        codec: "h264",
-        concurrency: 4,
-      });
-      console.log(`[Pipeline] Phase D (compositor) done in ${((Date.now() - phaseD) / 1000).toFixed(1)}s`);
+      if (!isPhaseComplete(checkpoint, "D")) {
+        this.opts.progress?.startPhase("D", "Compositor — rendering");
+        const phaseD = Date.now();
+        const brand = await loadBrand(this.config.brand);
+        toRemotion(brand); // validate brand maps correctly
+        const renderCodec = this.opts.preview ? "h264" : "h264";
+        await renderVideo({
+          projectDir: dirs.output,
+          outputPath: draftPath,
+          codec: renderCodec,
+          concurrency: 4,
+        });
+        await saveCheckpoint(dirs.output, "D", { draftPath });
+        this.opts.progress?.completePhase("D");
+        console.log(`[Pipeline] Phase D (compositor) done in ${((Date.now() - phaseD) / 1000).toFixed(1)}s`);
+      } else {
+        console.log("[Pipeline] Phase D: skipped (checkpoint)");
+      }
 
       // Phase E: FFmpeg HEVC export
+      this.opts.progress?.startPhase("E", "FFmpeg export");
       const phaseE = Date.now();
-      const finalPath = path.join(dirs.output, "final_1080p.mp4");
+      const suffix = this.opts.preview ? "720p" : "1080p";
+      const finalPath = path.join(dirs.output, `final_${suffix}.mp4`);
       const exportResult = await exportFinalVideo(draftPath, finalPath);
+      await saveCheckpoint(dirs.output, "E", { finalPath });
+      this.opts.progress?.completePhase("E");
       console.log(`[Pipeline] Phase E (export/${exportResult.encoder}) done in ${((Date.now() - phaseE) / 1000).toFixed(1)}s`);
 
       // Cleanup temp files
@@ -90,6 +160,7 @@ export class PipelineCoordinator {
         elapsedMs,
       };
     } catch (err) {
+      handleError(err as Error);
       return {
         success: false,
         error: (err as Error).message,

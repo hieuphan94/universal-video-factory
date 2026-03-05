@@ -3,10 +3,13 @@
 import "dotenv/config";
 import * as fs from "fs";
 import * as path from "path";
+import * as child_process from "child_process";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { parseArguments, ArgumentValidationError } from "./parse-arguments.js";
 import { PipelineCoordinator } from "../orchestrator/pipeline-coordinator.js";
+import { configureLogger } from "../utils/logger.js";
+import { ProgressDisplay } from "./progress-display.js";
 
 // Load .env.local if present (takes precedence over .env)
 const envLocalPath = path.resolve(process.cwd(), ".env.local");
@@ -55,6 +58,21 @@ const argv = await yargs(hideBin(process.argv))
     description: "Output directory path (default: ./output)",
     default: "./output",
   })
+  .option("resume", {
+    type: "boolean",
+    description: "Resume pipeline from last checkpoint",
+    default: false,
+  })
+  .option("preview", {
+    type: "boolean",
+    description: "Render at 720p for faster preview iteration",
+    default: false,
+  })
+  .option("verbose", {
+    type: "boolean",
+    description: "Enable debug-level log output",
+    default: false,
+  })
   .example(
     '$0 --url=https://example.com --feature="sign up"',
     "Record sign-up flow tutorial"
@@ -69,6 +87,25 @@ const argv = await yargs(hideBin(process.argv))
   .alias("v", "version")
   .strict()
   .parseAsync();
+
+// Startup dependency check
+function checkDependency(cmd: string): boolean {
+  try {
+    child_process.execSync(`command -v ${cmd}`, { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const missingDeps: string[] = [];
+if (!checkDependency("ffmpeg")) missingDeps.push("ffmpeg (brew install ffmpeg)");
+if (!checkDependency("node"))   missingDeps.push("node 20+ (brew install node)");
+if (missingDeps.length > 0) {
+  console.error("[video-factory] Missing required dependencies:");
+  for (const dep of missingDeps) console.error(`  - ${dep}`);
+  process.exit(1);
+}
 
 // Validate arguments
 let config;
@@ -91,6 +128,11 @@ try {
   throw err;
 }
 
+// Configure structured logger
+const outputDir = path.resolve(config.output);
+fs.mkdirSync(outputDir, { recursive: true });
+configureLogger(outputDir, argv.verbose);
+
 console.log(`[video-factory] Starting pipeline`);
 console.log(`  URL:     ${config.url}`);
 console.log(`  Feature: ${config.feature}`);
@@ -98,15 +140,23 @@ console.log(`  Lang:    ${config.lang}`);
 console.log(`  Output:  ${config.output}`);
 if (config.cookies) console.log(`  Cookies: ${config.cookies}`);
 if (config.manual)  console.log(`  Mode:    MANUAL`);
+if (argv.resume)    console.log(`  Resume:  enabled`);
+if (argv.preview)   console.log(`  Preview: 720p`);
 
-const coordinator = new PipelineCoordinator(config);
+const progress = new ProgressDisplay();
+const coordinator = new PipelineCoordinator(config, {
+  resume: argv.resume,
+  preview: argv.preview,
+  progress,
+});
 const result = await coordinator.run();
 
 if (result.success) {
-  console.log(`\n[video-factory] Done in ${(result.elapsedMs / 1000).toFixed(1)}s`);
-  console.log(`  Output: ${config.output}`);
+  const finalPath = result.export?.finalPath ?? config.output;
+  progress.summary(finalPath);
   process.exit(0);
 } else {
   console.error(`\n[video-factory] Pipeline failed: ${result.error}`);
+  console.error(`[video-factory] See pipeline.log in output dir for details.`);
   process.exit(1);
 }

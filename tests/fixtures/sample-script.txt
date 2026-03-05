@@ -1,0 +1,2 @@
+[SCENE:01] Welcome to the app. Click the sign up button to create your account.
+[SCENE:02] Enter your email and password then click submit to complete registration.

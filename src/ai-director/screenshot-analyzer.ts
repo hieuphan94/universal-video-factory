@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import * as fs from "fs";
 import type { DirectorConfig, ElementMap, ScreenshotAnalysis } from "./types.js";
 import { SCREENSHOT_ANALYSIS_PROMPT } from "./prompts.js";
+import { withRetry } from "../utils/retry.js";
 
 export class ScreenshotAnalyzer {
   private client: Anthropic;
@@ -23,7 +24,7 @@ export class ScreenshotAnalyzer {
     const imageData = fs.readFileSync(screenshotPath);
     const base64Image = imageData.toString("base64");
 
-    const response = await this.client.messages.create({
+    const response = await withRetry(() => this.client.messages.create({
       model: this.config.model,
       max_tokens: 4096,
       messages: [
@@ -45,7 +46,7 @@ export class ScreenshotAnalyzer {
           ],
         },
       ],
-    });
+    }));
 
     const rawText = response.content
       .filter((b) => b.type === "text")

@@ -1,0 +1,9 @@
+{
+  "name": "Test Brand",
+  "colors": {
+    "primary": "#2563EB",
+    "accent":  "#FFD700"
+  },
+  "intro": { "tagline": "Test tagline", "duration": 3 },
+  "outro": { "cta": "Try it", "url": "https://example.com", "duration": 4 }
+}

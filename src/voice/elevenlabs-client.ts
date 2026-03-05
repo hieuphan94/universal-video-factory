@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
 import { type ElevenLabsVoice, type TTSOptions, type VoiceSettings } from "./types.js";
+import { withRetry } from "../utils/retry.js";
 
 // Load .env.local
 const require = createRequire(import.meta.url);
@@ -89,47 +90,40 @@ export async function textToSpeech(
     voice_settings: voiceSettings,
   };
 
-  let attempt = 0;
-  const maxAttempts = 3;
+  return withRetry(
+    async () => {
+      const res = await fetch(`${BASE_URL}/v1/text-to-speech/${voiceId}`, {
+        method: "POST",
+        headers: headers({
+          "Content-Type": "application/json",
+          Accept: "audio/wav",
+        }),
+        body: JSON.stringify(body),
+      });
 
-  while (attempt < maxAttempts) {
-    attempt++;
-    const res = await fetch(`${BASE_URL}/v1/text-to-speech/${voiceId}`, {
-      method: "POST",
-      headers: headers({
-        "Content-Type": "application/json",
-        Accept: "audio/wav",
-      }),
-      body: JSON.stringify(body),
-    });
-
-    if (res.status === 429) {
-      // Rate limited — exponential backoff
-      const waitMs = 1000 * Math.pow(2, attempt);
-      console.warn(`[elevenlabs] Rate limited. Retrying in ${waitMs}ms...`);
-      await new Promise((r) => setTimeout(r, waitMs));
-      continue;
-    }
-
-    if (res.status === 422) {
-      const detail = await res.text();
-      // Quota exceeded check
-      if (detail.includes("quota") || detail.includes("character_limit")) {
-        console.error("[elevenlabs] Character quota exceeded. Upgrade plan or reduce text length.");
+      if (res.status === 429) {
+        throw new Error(`Rate limited (429) — will retry`);
       }
-      throw new Error(`textToSpeech failed (422): ${detail}`);
-    }
 
-    if (!res.ok) {
-      throw new Error(`textToSpeech failed: ${res.status} ${await res.text()}`);
-    }
+      if (res.status === 422) {
+        const detail = await res.text();
+        if (detail.includes("quota") || detail.includes("character_limit")) {
+          console.error("[elevenlabs] Character quota exceeded. Upgrade plan or reduce text length.");
+        }
+        // 422 is not retryable — throw without retry by re-throwing after max attempts
+        throw new Error(`textToSpeech failed (422): ${detail}`);
+      }
 
-    const buffer = await res.arrayBuffer();
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, Buffer.from(buffer));
-    console.log(`[elevenlabs] Saved audio → ${outputPath}`);
-    return outputPath;
-  }
+      if (!res.ok) {
+        throw new Error(`textToSpeech failed: ${res.status} ${await res.text()}`);
+      }
 
-  throw new Error(`textToSpeech failed after ${maxAttempts} attempts`);
+      const buffer = await res.arrayBuffer();
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, Buffer.from(buffer));
+      console.log(`[elevenlabs] Saved audio → ${outputPath}`);
+      return outputPath;
+    },
+    { maxAttempts: 3, initialDelayMs: 1000 }
+  );
 }
