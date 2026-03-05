@@ -18,7 +18,27 @@ if (fs.existsSync(envLocalPath)) {
   configDotenv({ path: envLocalPath, override: true });
 }
 
-const argv = await yargs(hideBin(process.argv))
+// Check if "serve" subcommand is being invoked
+const rawArgs = hideBin(process.argv);
+if (rawArgs[0] === "serve") {
+  const serveArgv = await yargs(rawArgs)
+    .command("serve", "Start web dashboard server", (y) =>
+      y.option("port", {
+        type: "number",
+        description: "Server port (default: 3456)",
+        default: 3456,
+      })
+    )
+    .help()
+    .parseAsync();
+
+  const { runServe } = await import("../server/serve-command.js");
+  runServe(serveArgv.port as number);
+  // Server keeps running — don't fall through to pipeline code
+  await new Promise(() => {}); // block forever
+}
+
+const argv = await yargs(rawArgs)
   .scriptName("video-factory")
   .usage("$0 --url <url> --feature <feature> [options]")
   .option("url", {
@@ -81,6 +101,7 @@ const argv = await yargs(hideBin(process.argv))
     '$0 --url=https://app.example.com --feature="checkout" --cookies=./session.json --output=./my-video',
     "Record authenticated checkout with cookies"
   )
+  .example("$0 serve --port=3456", "Start web dashboard")
   .help()
   .alias("h", "help")
   .version()

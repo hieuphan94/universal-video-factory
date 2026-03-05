@@ -1,8 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
-remotion/node_modules
+**/node_modules
 services/whisperx-service/.venv
 /.pnp
 .pnp.*
