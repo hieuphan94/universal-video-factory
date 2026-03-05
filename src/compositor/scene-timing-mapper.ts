@@ -46,9 +46,11 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
     fs.readFileSync(metadataPath, "utf-8")
   );
 
+  // Paths are relative to projectDir which is set as Remotion's publicDir.
+  // Remotion serves them via http://localhost:PORT/<relative-path>
   const scenes: SceneTiming[] = metadata.scenes.map((s) => ({
     id: s.id,
-    videoPath: path.resolve(projectDir, s.videoFile),
+    videoPath: `/${s.videoFile}`,
     startFrame: secondsToFrames(s.start),
     durationFrames: Math.max(1, secondsToFrames(s.end - s.start)),
   }));
@@ -60,7 +62,7 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
   }));
 
   const totalDurationFrames = secondsToFrames(metadata.totalDuration);
-  const audioPath = path.resolve(projectDir, metadata.audioFile);
+  const audioPath = `/${metadata.audioFile}`;
 
   return {
     scenes,

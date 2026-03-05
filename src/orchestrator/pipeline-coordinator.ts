@@ -18,6 +18,7 @@ import {
   getPhaseData,
 } from "./checkpoint-manager.js";
 import { handleError } from "./error-handler.js";
+import { runVoicePipeline } from "../voice/voice-pipeline.js";
 import type { ProgressDisplay } from "../cli/progress-display.js";
 import type { PipelineConfig, CaptureResult, PipelineResult, ExportPhaseResult } from "./types.js";
 import type { DirectorConfig } from "../ai-director/types.js";
@@ -108,6 +109,30 @@ export class PipelineCoordinator {
         console.log(`[Pipeline] Phase C (webm→mp4) done in ${((Date.now() - phaseC) / 1000).toFixed(1)}s`);
       } else {
         console.log("[Pipeline] Phase C: skipped (checkpoint)");
+      }
+
+      // Phase C2: Voice pipeline — TTS + WhisperX alignment → words_timestamps.json
+      if (!isPhaseComplete(checkpoint, "C2")) {
+        this.opts.progress?.startPhase("C2", "Voice — TTS + alignment");
+        const phaseC2 = Date.now();
+        const voiceResult = await runVoicePipeline({
+          scriptPath: captureResult.scriptPath,
+          outputDir: dirs.output,
+          voiceId: this.config.voice ?? undefined,
+          language: this.config.lang,
+        });
+
+        // Update capture_metadata.json with audio info and scene timing from voice
+        await this.updateMetadataWithVoice(captureResult.metadataPath, voiceResult.audioPath, voiceResult.totalDuration);
+
+        await saveCheckpoint(dirs.output, "C2", {
+          audioPath: voiceResult.audioPath,
+          timestampsPath: voiceResult.timestampsPath,
+        });
+        this.opts.progress?.completePhase("C2");
+        console.log(`[Pipeline] Phase C2 (voice) done in ${((Date.now() - phaseC2) / 1000).toFixed(1)}s`);
+      } else {
+        console.log("[Pipeline] Phase C2: skipped (checkpoint)");
       }
 
       // Phase D: Remotion compositor → draft.mp4
@@ -315,6 +340,45 @@ export class PipelineCoordinator {
       pageLoadTimeoutMs: parseInt(process.env.PAGE_LOAD_TIMEOUT_MS ?? "30000"),
       clickActionTimeoutMs: parseInt(process.env.CLICK_ACTION_TIMEOUT_MS ?? "10000"),
     };
+  }
+
+  /**
+   * Update capture_metadata.json with audio file path, total duration,
+   * and scene start/end times derived from voice timestamps.
+   * This bridges the capture metadata format to what scene-timing-mapper expects.
+   */
+  private async updateMetadataWithVoice(
+    metadataPath: string,
+    audioPath: string,
+    totalDuration: number
+  ): Promise<void> {
+    const raw = await fs.readFile(metadataPath, "utf-8");
+    const metadata = JSON.parse(raw);
+
+    // Read words_timestamps.json to get scene boundaries
+    const tsPath = path.join(path.dirname(metadataPath), "words_timestamps.json");
+    const tsRaw = await fs.readFile(tsPath, "utf-8");
+    const timestamps = JSON.parse(tsRaw);
+
+    // Map scene boundaries from voice timestamps onto capture metadata
+    metadata.audioFile = path.relative(path.dirname(metadataPath), audioPath);
+    metadata.totalDuration = totalDuration;
+    metadata.scenes = metadata.scenes.map((scene: Record<string, unknown>, i: number) => {
+      const boundary = timestamps.scenes?.[i];
+      // Ensure video references point to .mp4 (Phase C converts .webm → .mp4)
+      const rawFile = String(scene.videoFile ?? `scene-${String(i + 1).padStart(2, "0")}.mp4`);
+      const baseName = rawFile.replace(/^scenes\//, "").replace(/\.webm$/, ".mp4");
+      return {
+        ...scene,
+        id: boundary?.id ?? `SCENE:${String(i + 1).padStart(2, "0")}`,
+        videoFile: `scenes/${baseName}`,
+        start: boundary?.start_time ?? 0,
+        end: boundary?.end_time ?? totalDuration,
+      };
+    });
+
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+    console.log("[Pipeline] Updated capture_metadata.json with voice timing");
   }
 
   private async createOutputDirs(): Promise<OutputDirs> {

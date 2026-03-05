@@ -1,5 +1,16 @@
 // Generic retry utility with exponential backoff
 
+/** Errors matching these patterns should never be retried */
+const NON_RETRYABLE_PATTERNS = [
+  /credit balance/i,
+  /billing/i,
+  /API_KEY.*not set/i,
+  /ENOENT/,
+  /not found/i,
+  /invalid.*config/i,
+  /invalid url/i,
+];
+
 export interface RetryOptions {
   maxAttempts?: number;
   initialDelayMs?: number;
@@ -34,6 +45,10 @@ export async function withRetry<T>(
       return await fn();
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+
+      // Bail immediately on non-retryable errors
+      const msg = lastError.message;
+      if (NON_RETRYABLE_PATTERNS.some((p) => p.test(msg))) break;
 
       if (attempt === maxAttempts) break;
 

@@ -1,4 +1,5 @@
 import * as path from "path";
+import * as fs from "fs";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
 import { mapProjectToRenderProps } from "./scene-timing-mapper.js";
@@ -36,6 +37,10 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
     // Silence webpack progress spam during render
     onProgress: () => undefined,
   });
+
+  // Copy audio and video assets into the bundle so Remotion's server can serve them
+  const absoluteProjectDir = path.resolve(projectDir);
+  copyAssetsToBundle(absoluteProjectDir, bundled);
 
   console.log(`[render-engine] Loading input props from ${projectDir}`);
   const inputProps = mapProjectToRenderProps(projectDir);
@@ -78,4 +83,20 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
     durationMs,
     framesRendered: composition.durationInFrames,
   };
+}
+
+/**
+ * Copy audio/ and scenes/ directories from the project output into the
+ * Remotion webpack bundle directory so they're accessible via the dev server.
+ */
+function copyAssetsToBundle(projectDir: string, bundleDir: string): void {
+  const dirs = ["audio", "scenes"];
+  for (const dir of dirs) {
+    const src = path.join(projectDir, dir);
+    const dest = path.join(bundleDir, dir);
+    if (fs.existsSync(src)) {
+      fs.cpSync(src, dest, { recursive: true });
+    }
+  }
+  console.log(`[render-engine] Copied assets to bundle`);
 }

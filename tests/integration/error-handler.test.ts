@@ -102,6 +102,17 @@ describe("error-handler integration", () => {
 
       expect(classified.category).toBe("fatal");
     });
+
+    it("classifies credit balance errors as fatal", () => {
+      const err = new Error(
+        '400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}'
+      );
+      const classified = classifyError(err);
+
+      expect(classified.category).toBe("fatal");
+      expect(classified.userMessage).toContain("credit balance");
+      expect(classified.suggestion).toContain("console.anthropic.com");
+    });
   });
 
   describe("classifyError — unknown errors", () => {

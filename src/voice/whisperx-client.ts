@@ -9,12 +9,12 @@ import { type WhisperXAlignResponse, type WordTimestamp } from "./types.js";
 const SERVICE_URL = "http://127.0.0.1:8765";
 const HEALTH_URL = `${SERVICE_URL}/health`;
 const ALIGN_URL = `${SERVICE_URL}/align`;
-const START_TIMEOUT_MS = 120_000;
+const START_TIMEOUT_MS = 15_000;
 const HEALTH_POLL_MS = 2_000;
 
 const SERVICE_DIR = path.resolve(
   new URL(".", import.meta.url).pathname,
-  "../../../services/whisperx-service"
+  "../../services/whisperx-service"
 );
 
 /** Check if the WhisperX service is reachable. */

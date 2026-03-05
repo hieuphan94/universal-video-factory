@@ -30,6 +30,8 @@ const RETRYABLE_PATTERNS = [
 /** Patterns that indicate fatal config/dependency errors */
 const FATAL_PATTERNS = [
   /API_KEY.*not set/i,
+  /credit balance/i,
+  /billing/i,
   /not found/i,
   /ENOENT/,
   /invalid.*config/i,
@@ -95,6 +97,9 @@ export function handleError(err: Error): boolean {
 }
 
 function buildFatalMessage(msg: string): string {
+  if (/credit balance/i.test(msg) || /billing/i.test(msg)) {
+    return "Anthropic API credit balance is too low.";
+  }
   if (/API_KEY/i.test(msg)) {
     const key = msg.match(/(\w+_API_KEY)/)?.[1] ?? "API_KEY";
     return `Missing environment variable: ${key}`;
@@ -109,6 +114,8 @@ function buildFatalMessage(msg: string): string {
 }
 
 function buildSuggestion(msg: string): string {
+  if (/credit balance/i.test(msg) || /billing/i.test(msg))
+    return "Top up credits at https://console.anthropic.com/settings/billing";
   if (/ANTHROPIC_API_KEY/i.test(msg)) return "Add ANTHROPIC_API_KEY to .env.local";
   if (/ELEVENLABS_API_KEY/i.test(msg)) return "Add ELEVENLABS_API_KEY to .env.local";
   if (/ffmpeg/i.test(msg)) return "Install FFmpeg: brew install ffmpeg";
