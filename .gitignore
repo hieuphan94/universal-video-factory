@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+remotion/node_modules
+services/whisperx-service/.venv
 /.pnp
 .pnp.*
 .yarn/*
