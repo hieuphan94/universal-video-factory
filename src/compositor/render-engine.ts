@@ -85,6 +85,53 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
   };
 }
 
+/** Render with pre-built input props (used by tutorial pipeline with markers.json) */
+export async function renderVideoWithProps(options: {
+  projectDir: string;
+  outputPath: string;
+  inputProps: Record<string, unknown>;
+  codec?: "h264" | "h265" | "vp8" | "vp9";
+  concurrency?: number;
+  onProgress?: (progress: number) => void;
+}): Promise<RenderResult> {
+  const { projectDir, outputPath, inputProps, codec = "h264", concurrency = 4, onProgress } = options;
+  const startMs = Date.now();
+
+  console.log(`[render-engine] Bundling Remotion composition...`);
+  const bundled = await bundle({ entryPoint: REMOTION_ROOT, onProgress: () => undefined });
+
+  const absoluteProjectDir = path.resolve(projectDir);
+  copyAssetsToBundle(absoluteProjectDir, bundled);
+
+  const composition = await selectComposition({
+    serveUrl: bundled,
+    id: COMPOSITION_ID,
+    inputProps,
+  });
+
+  console.log(`[render-engine] Rendering ${composition.durationInFrames} frames at ${composition.fps}fps`);
+
+  await renderMedia({
+    composition,
+    serveUrl: bundled,
+    codec,
+    outputLocation: outputPath,
+    inputProps,
+    concurrency,
+    onProgress: ({ progress }: { progress: number }) => {
+      const pct = Math.round(progress * 100);
+      onProgress?.(pct);
+      process.stdout.write(`\r[render-engine] Progress: ${pct}%`);
+    },
+  });
+
+  process.stdout.write("\n");
+  const durationMs = Date.now() - startMs;
+  console.log(`[render-engine] Done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
+
+  return { outputPath, durationMs, framesRendered: composition.durationInFrames };
+}
+
 /**
  * Copy audio/ and scenes/ directories from the project output into the
  * Remotion webpack bundle directory so they're accessible via the dev server.

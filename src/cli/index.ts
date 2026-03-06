@@ -86,6 +86,11 @@ if (subcommand === "record-clip") {
   const y = yargs(rawArgs);
   registerDetectCommand(y);
   await y.help().parseAsync();
+} else if (subcommand === "tutorial") {
+  const { registerTutorialCommand } = await import("./tutorial-command.js");
+  const y = yargs(rawArgs);
+  registerTutorialCommand(y);
+  await y.help().parseAsync();
 } else if (subcommand === "serve") {
   const serveArgv = await yargs(rawArgs)
     .command("serve", "Start web dashboard server", (y) =>
