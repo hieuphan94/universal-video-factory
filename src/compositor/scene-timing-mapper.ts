@@ -75,7 +75,10 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
     endFrame: secondsToFrames(w.end) + INTRO_FRAMES,
   }));
 
-  const totalDurationFrames = secondsToFrames(metadata.totalDuration);
+  // totalDurationFrames = full video length (intro + content + outro)
+  const OUTRO_FRAMES = 120; // matches props-schema default outroDuration
+  const contentFrames = secondsToFrames(metadata.totalDuration);
+  const totalDurationFrames = INTRO_FRAMES + contentFrames + OUTRO_FRAMES;
   const audioPath = `/${metadata.audioFile}`;
 
   // Generate click events from scene metadata (one click per scene with valid coordinates).

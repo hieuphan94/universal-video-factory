@@ -25,7 +25,7 @@ const defaultProps = {
   fps: 30,
   width: 1920,
   height: 1080,
-  totalDurationFrames: 150,
+  totalDurationFrames: 360, // 90 intro + 150 content + 120 outro
   // Phase 4 visual effects — empty defaults for Studio preview
   brand: undefined,
   clicks: [],
@@ -55,8 +55,8 @@ export const RemotionRoot: React.FC = () => {
       schema={UniversalTemplatePropsSchema}
       defaultProps={defaultProps}
       calculateMetadata={async ({ props }) => ({
-        // Total = intro + content + outro (totalDurationFrames is content only)
-        durationInFrames: props.totalDurationFrames + props.introDuration + props.outroDuration,
+        // totalDurationFrames already includes intro + content + outro
+        durationInFrames: props.totalDurationFrames,
         fps: props.fps,
         width: props.width,
         height: props.height,

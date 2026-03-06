@@ -77,10 +77,11 @@ describe("mapProjectToRenderProps", () => {
     expect(props.audioPath).toBe("/audio/voiceover.wav");
   });
 
-  it("calculates totalDurationFrames from metadata", () => {
+  it("calculates totalDurationFrames including intro + content + outro", () => {
     writeFixtures(sampleMetadata, sampleTimestamps);
     const props = mapProjectToRenderProps(tmpDir);
-    expect(props.totalDurationFrames).toBe(300); // 10s * 30fps
+    // 90 intro + 300 content (10s * 30fps) + 120 outro = 510
+    expect(props.totalDurationFrames).toBe(510);
   });
 
   it("returns fixed output dimensions and fps", () => {
