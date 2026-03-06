@@ -11,6 +11,7 @@ import { renderVideoWithProps } from "../compositor/render-engine.js";
 import { exportFinalVideo } from "../export/ffmpeg-exporter.js";
 import type { RecordingSession } from "../recorder/recorder-types.js";
 import type { TutorialScript } from "../script/script-types.js";
+import { fetchTreeNode } from "../integrations/tree-id-client.js";
 
 export interface TutorialPipelineOptions {
   url: string;
@@ -18,6 +19,10 @@ export interface TutorialPipelineOptions {
   lang?: string;
   output?: string;
   voiceId?: string;
+  /** tree-id node ID — fetches content to enrich script generation */
+  treeId?: string;
+  /** tree-id source (API URL or local JSON path) */
+  treeIdSource?: string;
 }
 
 export interface TutorialPipelineResult {
@@ -34,12 +39,27 @@ export async function runTutorialPipeline(
   const outputDir = path.resolve(opts.output ?? "./output/tutorial");
   fs.mkdirSync(outputDir, { recursive: true });
 
+  // Step 0: Resolve tree-id content if provided
+  let url = opts.url;
+  let purpose = opts.purpose;
+  let contentText: string | undefined;
+
+  if (opts.treeId) {
+    console.log(`\n[tutorial] Fetching tree-id node: ${opts.treeId}`);
+    const node = await fetchTreeNode(opts.treeId, opts.treeIdSource ? { source: opts.treeIdSource } : undefined);
+    url = url || node.url;
+    purpose = purpose || node.title;
+    contentText = `${node.title}\n\n${node.description}\n\nTags: ${node.tags.join(", ")}`;
+    console.log(`[tutorial] tree-id: "${node.title}" → ${node.url}`);
+  }
+
   // Step 1: Generate script
   console.log("\n[tutorial] Step 1/5: Generating script...");
   const script = await generateTutorialScript({
-    url: opts.url,
-    purpose: opts.purpose,
+    url,
+    purpose,
     lang: opts.lang ?? "en",
+    content: contentText,
   });
   const scriptPath = path.join(outputDir, "script.json");
   fs.writeFileSync(scriptPath, JSON.stringify(script, null, 2));
@@ -49,7 +69,7 @@ export async function runTutorialPipeline(
   console.log("\n[tutorial] Step 2/5: Recording screen (human-assisted)...");
   console.log("[tutorial] Press SPACE to advance steps, ESC to stop recording.");
   const recording = await recordHumanSession({
-    url: opts.url,
+    url,
     script,
     outputDir,
   });
