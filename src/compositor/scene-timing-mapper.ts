@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import type { SceneTiming, WordFrame, RenderInputProps } from "./types.js";
+import type { SceneTiming, WordFrame, ClickEvent, RenderInputProps } from "./types.js";
 
 // Shape of words_timestamps.json
 interface WordsTimestampsFile {
@@ -9,7 +9,15 @@ interface WordsTimestampsFile {
 
 // Shape of capture_metadata.json
 interface CaptureMetadata {
-  scenes: { id: string; videoFile: string; start: number; end: number; actionDescription?: string }[];
+  scenes: {
+    id: string;
+    videoFile: string;
+    start: number;
+    end: number;
+    actionDescription?: string;
+    clickX?: number;
+    clickY?: number;
+  }[];
   audioFile: string;
   totalDuration: number;
 }
@@ -64,6 +72,17 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
   const totalDurationFrames = secondsToFrames(metadata.totalDuration);
   const audioPath = `/${metadata.audioFile}`;
 
+  // Generate click events from scene metadata (one click per scene with valid coordinates).
+  // Each click appears 15 frames into the scene so the viewer sees the action context first.
+  const clicks: ClickEvent[] = metadata.scenes
+    .filter((s) => s.clickX != null && s.clickY != null && s.clickX > 0 && s.clickY > 0)
+    .map((s) => ({
+      x: s.clickX!,
+      y: s.clickY!,
+      frame: secondsToFrames(s.start) + 15,
+      duration: 30,
+    }));
+
   return {
     scenes,
     audioPath,
@@ -72,5 +91,6 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
     width: 1920,
     height: 1080,
     totalDurationFrames,
+    clicks,
   };
 }

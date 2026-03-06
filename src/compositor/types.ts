@@ -13,6 +13,14 @@ export interface WordFrame {
   endFrame: number;
 }
 
+/** Click event for Remotion click highlight + zoom */
+export interface ClickEvent {
+  x: number;
+  y: number;
+  frame: number;
+  duration: number;
+}
+
 /** Full props passed to Remotion renderMedia as inputProps */
 export interface RenderInputProps {
   scenes: SceneTiming[];
@@ -22,6 +30,7 @@ export interface RenderInputProps {
   width: number;
   height: number;
   totalDurationFrames: number;
+  clicks?: ClickEvent[];
 }
 
 export interface RenderOptions {

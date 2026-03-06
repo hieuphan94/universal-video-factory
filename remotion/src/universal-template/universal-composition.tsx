@@ -37,6 +37,35 @@ export const UniversalComposition: React.FC<UniversalTemplateProps> = ({
 }) => {
   const { width, height, durationInFrames } = useVideoConfig();
 
+  // Auto-generate a SINGLE zoom event spanning all action scenes.
+  // Scene 0 = intro/overview (no zoom). Zoom in at scene 1, hold through all
+  // remaining action scenes, zoom out at the last scene's end.
+  const effectiveZoomEvents = (() => {
+    if (zoomEvents.length > 0) return zoomEvents;
+    if (scenes.length < 2 || clicks.length === 0) return [];
+
+    // First action scene (skip scene 0 = overview/intro)
+    const firstAction = scenes[1] ?? scenes[0];
+    const lastScene = scenes[scenes.length - 1];
+    const zoomStart = firstAction.startFrame;
+    const zoomEnd = lastScene.startFrame + lastScene.durationFrames;
+    // Hold = total span minus 15f zoom-in and 15f zoom-out
+    const holdDuration = Math.max(1, zoomEnd - zoomStart - 30);
+
+    // Use first click's position as zoom focus point
+    const focusClick = clicks[0];
+
+    return [
+      {
+        frame: zoomStart,
+        x: focusClick.x,
+        y: focusClick.y,
+        scale: 1.35,
+        duration: holdDuration,
+      },
+    ];
+  })();
+
   // Duration of the main content window (between intro and outro)
   const contentStart = introDuration;
   const contentEnd = durationInFrames - outroDuration;
@@ -79,7 +108,7 @@ export const UniversalComposition: React.FC<UniversalTemplateProps> = ({
           durationInFrames={contentDuration}
           name="content"
         >
-          <ZoomContainer zoomEvents={zoomEvents}>
+          <ZoomContainer zoomEvents={effectiveZoomEvents}>
             <ContinuousScreen
               videoPath={continuousVideoPath}
               width={width}
