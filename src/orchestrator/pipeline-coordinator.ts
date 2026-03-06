@@ -12,7 +12,6 @@ import { SceneRecorder } from "../capture/scene-recorder.js";
 import { renderVideo } from "../compositor/render-engine.js";
 import { loadBrand, toRemotion } from "../compositor/brand-loader.js";
 import { convertWebmToMp4, exportFinalVideo } from "../export/ffmpeg-exporter.js";
-import { saveChapters } from "../export/chapter-generator.js";
 import {
   saveCheckpoint,
   loadCheckpoint,
@@ -172,13 +171,6 @@ export class PipelineCoordinator {
       await saveCheckpoint(dirs.output, "F", { finalPath });
       this.opts.progress?.completePhase("F");
       console.log(`[Pipeline] Phase F (export/${exportResult.encoder}) done in ${((Date.now() - t) / 1000).toFixed(1)}s`);
-
-      // Generate YouTube chapters from metadata
-      try {
-        await saveChapters(dirs.output);
-      } catch {
-        console.warn("[Pipeline] Could not generate chapters.txt");
-      }
 
       await this.cleanupTemp(dirs.temp);
 

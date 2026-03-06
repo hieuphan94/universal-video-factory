@@ -170,10 +170,6 @@ export class SceneRecorder {
     const desc = action.description;
     const descLower = desc.toLowerCase();
 
-    const target = action.selector
-      ? await page.$(action.selector).catch(() => null)
-      : null;
-
     const typeMatch = desc.match(/type[^'"]*['"]([^'"]+)['"]/i)
       ?? desc.match(/enter[^'"]*['"]([^'"]+)['"]/i)
       ?? desc.match(/example\s+['"]([^'"]+)['"]/i)
@@ -183,14 +179,13 @@ export class SceneRecorder {
       ?? desc.match(/press\s+(\w+)/i);
 
     if (descLower.includes("click") || descLower.includes("focus")) {
-      if (target) {
-        await target.scrollIntoViewIfNeeded();
-        const box = await target.boundingBox();
-        if (box) {
-          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 15 });
-          await page.waitForTimeout(200);
-          await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-        }
+      // Try to find the right element: first by smart locator from description,
+      // then by provided selector, then fallback to coordinates
+      const clickTarget = await this.resolveClickTarget(page, action);
+      if (clickTarget) {
+        await page.mouse.move(clickTarget.x, clickTarget.y, { steps: 15 });
+        await page.waitForTimeout(200);
+        await page.mouse.click(clickTarget.x, clickTarget.y);
       } else {
         await page.mouse.move(action.x, action.y, { steps: 15 });
         await page.waitForTimeout(200);
@@ -204,7 +199,7 @@ export class SceneRecorder {
       await page.waitForTimeout(500);
     }
 
-    if (pressMatch && !typeMatch) {
+    if (pressMatch) {
       const keyMap: Record<string, string> = {
         enter: "Enter", tab: "Tab", escape: "Escape",
         backspace: "Backspace", delete: "Delete", space: "Space",
@@ -221,6 +216,103 @@ export class SceneRecorder {
       await page.waitForTimeout(200);
       await page.mouse.click(action.x, action.y);
     }
+  }
+
+  /**
+   * Resolve the best click target by parsing the action description for context clues.
+   * Uses Playwright locators (role, text, label) to find elements that didn't exist
+   * at initial screenshot time (e.g., checkboxes created after adding todo items).
+   * Falls back to the provided selector if no smart match is found.
+   */
+  private async resolveClickTarget(
+    page: Page,
+    action: PlannedAction
+  ): Promise<{ x: number; y: number } | null> {
+    const desc = action.description.toLowerCase();
+
+    // Extract text context from description (e.g., "next to 'Buy groceries'" or "for 'Buy groceries'")
+    const textContext = action.description.match(
+      /(?:next to|for|of|labeled?|named?)\s+['"]([^'"]+)['"]/i
+    );
+    const contextText = textContext?.[1];
+
+    // Try smart locator strategies based on description keywords
+    const locator = await this.findSmartLocator(page, desc, contextText);
+    if (locator) {
+      const box = await locator.boundingBox().catch(() => null);
+      if (box) {
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      }
+    }
+
+    // Fallback: use the provided selector
+    if (action.selector) {
+      const el = await page.$(action.selector).catch(() => null);
+      if (el) {
+        await el.scrollIntoViewIfNeeded();
+        const box = await el.boundingBox();
+        if (box) {
+          return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Find an element using Playwright's semantic locators based on description keywords.
+   * Handles checkboxes, buttons, links, and other interactive elements.
+   */
+  private async findSmartLocator(
+    page: Page,
+    desc: string,
+    contextText?: string
+  ): Promise<import("playwright").Locator | null> {
+    try {
+      // Checkbox: find by role near context text
+      if (desc.includes("checkbox") || desc.includes("check") || desc.includes("toggle") || desc.includes("complete") || desc.includes("mark")) {
+        if (contextText) {
+          // Find the list item containing the text, then its checkbox
+          const item = page.locator(`text="${contextText}"`).first();
+          if (await item.isVisible().catch(() => false)) {
+            const checkbox = item.locator("..").locator('input[type="checkbox"]').first();
+            if (await checkbox.isVisible().catch(() => false)) return checkbox;
+            // Try sibling/parent checkbox via role
+            const roleCheckbox = item.locator("..").getByRole("checkbox").first();
+            if (await roleCheckbox.isVisible().catch(() => false)) return roleCheckbox;
+          }
+          // Broader: any checkbox in the same parent container as the text
+          const container = page.locator(`:has(> :text("${contextText}")) input[type="checkbox"]`).first();
+          if (await container.isVisible().catch(() => false)) return container;
+        }
+        // No context: first visible checkbox
+        const anyCheckbox = page.getByRole("checkbox").first();
+        if (await anyCheckbox.isVisible().catch(() => false)) return anyCheckbox;
+      }
+
+      // Button: find by text or role
+      if (desc.includes("button")) {
+        const btnTextMatch = desc.match(/['"]([^'"]+)['"]/);
+        if (btnTextMatch) {
+          const btn = page.getByRole("button", { name: btnTextMatch[1] }).first();
+          if (await btn.isVisible().catch(() => false)) return btn;
+        }
+      }
+
+      // Link: find by text
+      if (desc.includes("link") || desc.includes("click on")) {
+        const linkTextMatch = desc.match(/['"]([^'"]+)['"]/);
+        if (linkTextMatch) {
+          const link = page.getByRole("link", { name: linkTextMatch[1] }).first();
+          if (await link.isVisible().catch(() => false)) return link;
+        }
+      }
+    } catch {
+      // Locator strategies are best-effort
+    }
+
+    return null;
   }
 
   /** Stagehand natural-language fallback for low-confidence actions */

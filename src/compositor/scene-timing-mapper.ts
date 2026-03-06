@@ -1,6 +1,5 @@
 import * as fs from "fs";
 import * as path from "path";
-import { planTransitions } from "./transition-planner.js";
 import type { SceneTiming, WordFrame, RenderInputProps } from "./types.js";
 
 // Shape of words_timestamps.json
@@ -13,11 +12,6 @@ interface CaptureMetadata {
   scenes: { id: string; videoFile: string; start: number; end: number; actionDescription?: string }[];
   audioFile: string;
   totalDuration: number;
-}
-
-// Shape of click_plan.json (for narration text)
-interface ClickPlanFile {
-  actions: { narration?: string; description?: string }[];
 }
 
 const FPS = 30;
@@ -70,20 +64,6 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
   const totalDurationFrames = secondsToFrames(metadata.totalDuration);
   const audioPath = `/${metadata.audioFile}`;
 
-  // Load click plan for narration text (used by transition planner)
-  const clickPlanPath = path.join(projectDir, "click_plan.json");
-  let sceneNarrations: { narration?: string; actionDescription?: string }[] = [];
-  if (fs.existsSync(clickPlanPath)) {
-    const clickPlan: ClickPlanFile = JSON.parse(fs.readFileSync(clickPlanPath, "utf-8"));
-    sceneNarrations = clickPlan.actions.map((a) => ({
-      narration: a.narration,
-      actionDescription: a.description,
-    }));
-  }
-
-  // Plan transitions based on narration context
-  const transitions = planTransitions(sceneNarrations);
-
   return {
     scenes,
     audioPath,
@@ -92,6 +72,5 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
     width: 1920,
     height: 1080,
     totalDurationFrames,
-    transitions,
   };
 }

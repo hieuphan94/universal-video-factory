@@ -9,8 +9,6 @@ import { IntroSequence } from "../components/intro-sequence";
 import { OutroSequence } from "../components/outro-sequence";
 import { ProgressBar } from "../components/progress-bar";
 import { StepCounter } from "../components/step-counter";
-import { SceneTransition } from "../components/scene-transition";
-import { MemeInsert } from "../components/meme-insert";
 import type { UniversalTemplateProps } from "./props-schema";
 
 /**
@@ -36,8 +34,6 @@ export const UniversalComposition: React.FC<UniversalTemplateProps> = ({
   outroDuration,
   cta,
   steps,
-  transitions = [],
-  memeInserts = [],
 }) => {
   const { width, height, durationInFrames } = useVideoConfig();
 
@@ -91,27 +87,7 @@ export const UniversalComposition: React.FC<UniversalTemplateProps> = ({
             />
           </ZoomContainer>
 
-          {/* Layer 4: Scene transitions — overlay per scene boundary */}
-          {transitions
-            .filter((t) => t.type !== "none" && t.durationFrames > 0)
-            .map((t) => {
-              const scene = scenes[t.sceneIndex];
-              if (!scene) return null;
-              return (
-                <Sequence
-                  key={`transition-${t.sceneIndex}`}
-                  from={scene.startFrame}
-                  durationInFrames={t.durationFrames}
-                  name={`transition-${t.sceneIndex}`}
-                >
-                  <SceneTransition type={t.type} durationFrames={t.durationFrames}>
-                    <div style={{ position: "absolute", inset: 0, backgroundColor: "#000" }} />
-                  </SceneTransition>
-                </Sequence>
-              );
-            })}
-
-          {/* Layer 5: Click highlights — rendered above zoom for visibility */}
+          {/* Layer 4: Click highlights — rendered above zoom for visibility */}
           {clicks.map((click, i) => (
             <ClickHighlight
               key={`click-${i}-${click.frame}`}
@@ -122,27 +98,6 @@ export const UniversalComposition: React.FC<UniversalTemplateProps> = ({
             />
           ))}
 
-          {/* Layer 6: Meme/reaction inserts */}
-          {memeInserts.map((meme, i) => {
-            const scene = scenes[meme.sceneIndex];
-            if (!scene) return null;
-            const memeStart = scene.startFrame + meme.frameOffset;
-            return (
-              <Sequence
-                key={`meme-${i}-${meme.sceneIndex}`}
-                from={memeStart}
-                durationInFrames={meme.durationFrames}
-                name={`meme-${meme.sceneIndex}`}
-              >
-                <MemeInsert
-                  src={meme.src}
-                  mode={meme.mode}
-                  durationFrames={meme.durationFrames}
-                  position={meme.position}
-                />
-              </Sequence>
-            );
-          })}
         </Sequence>
       )}
 

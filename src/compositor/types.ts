@@ -13,23 +13,6 @@ export interface WordFrame {
   endFrame: number;
 }
 
-/** Transition config for a scene boundary */
-export interface TransitionConfig {
-  sceneIndex: number;
-  type: string;
-  durationFrames: number;
-}
-
-/** Meme insert config resolved with asset path */
-export interface MemeInsertConfig {
-  sceneIndex: number;
-  frameOffset: number;
-  src: string;
-  mode: "pip" | "fullscreen";
-  durationFrames: number;
-  position?: "top-left" | "top-right" | "bottom-left" | "bottom-right";
-}
-
 /** Full props passed to Remotion renderMedia as inputProps */
 export interface RenderInputProps {
   scenes: SceneTiming[];
@@ -39,8 +22,6 @@ export interface RenderInputProps {
   width: number;
   height: number;
   totalDurationFrames: number;
-  transitions?: TransitionConfig[];
-  memeInserts?: MemeInsertConfig[];
 }
 
 export interface RenderOptions {

@@ -127,29 +127,4 @@ describe("mapProjectToRenderProps", () => {
     const props = mapProjectToRenderProps(tmpDir);
     expect(props.scenes[0].durationFrames).toBe(1);
   });
-
-  it("includes transitions array in output", () => {
-    writeFixtures(sampleMetadata, sampleTimestamps);
-    const props = mapProjectToRenderProps(tmpDir);
-    expect(props.transitions).toBeDefined();
-    expect(Array.isArray(props.transitions)).toBe(true);
-  });
-
-  it("plans transitions from click_plan.json narration when available", () => {
-    writeFixtures(sampleMetadata, sampleTimestamps);
-    const clickPlan = {
-      actions: [
-        { narration: "Welcome", description: "intro" },
-        { narration: "Now the next step", description: "click button" },
-      ],
-    };
-    fs.writeFileSync(
-      path.join(tmpDir, "click_plan.json"),
-      JSON.stringify(clickPlan)
-    );
-    const props = mapProjectToRenderProps(tmpDir);
-    expect(props.transitions).toHaveLength(2);
-    expect(props.transitions![0].type).toBe("none"); // first scene
-    expect(props.transitions![1].type).toBe("slide-left"); // "next step"
-  });
 });

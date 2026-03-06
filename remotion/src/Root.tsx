@@ -53,7 +53,8 @@ export const RemotionRoot: React.FC = () => {
       schema={UniversalTemplatePropsSchema}
       defaultProps={defaultProps}
       calculateMetadata={async ({ props }) => ({
-        durationInFrames: props.totalDurationFrames,
+        // Total = intro + content + outro (totalDurationFrames is content only)
+        durationInFrames: props.totalDurationFrames + props.introDuration + props.outroDuration,
         fps: props.fps,
         width: props.width,
         height: props.height,

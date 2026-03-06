@@ -43,23 +43,6 @@ const ZoomEventSchema = z.object({
   duration: z.number().int().positive(),
 });
 
-// Scene transition config
-const TransitionSchema = z.object({
-  sceneIndex: z.number().int().nonnegative(),
-  type: z.enum(["fade", "slide-left", "slide-right", "zoom-in", "zoom-out", "blur-dissolve", "none"]),
-  durationFrames: z.number().int().nonnegative().default(15),
-});
-
-// Meme/reaction insert config
-const MemeInsertSchema = z.object({
-  sceneIndex: z.number().int().nonnegative(),
-  frameOffset: z.number().int().nonnegative().default(15),
-  src: z.string(),
-  mode: z.enum(["pip", "fullscreen"]).default("pip"),
-  durationFrames: z.number().int().positive().default(45),
-  position: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).default("bottom-right"),
-});
-
 // Call-to-action for outro
 const CtaSchema = z.object({
   text: z.string(),
@@ -90,12 +73,6 @@ export const UniversalTemplatePropsSchema = z.object({
   outroDuration: z.number().int().nonnegative().default(120),
   cta: CtaSchema.optional(),
 
-  // Scene transitions (Phase 2C.1)
-  transitions: z.array(TransitionSchema).default([]),
-
-  // Meme/reaction inserts (Phase 2C.2)
-  memeInserts: z.array(MemeInsertSchema).default([]),
-
   // PiP overlays (Phase 5)
   // steps mirrors scenes but carries display labels; totalScenes = scenes.length
   steps: z.array(StepSchema).default([]),
@@ -108,6 +85,4 @@ export type BrandProps = z.infer<typeof BrandSchema>;
 export type ClickProps = z.infer<typeof ClickSchema>;
 export type ZoomEventProps = z.infer<typeof ZoomEventSchema>;
 export type CtaProps = z.infer<typeof CtaSchema>;
-export type TransitionProps = z.infer<typeof TransitionSchema>;
-export type MemeInsertProps = z.infer<typeof MemeInsertSchema>;
 export type StepProps = z.infer<typeof StepSchema>;
