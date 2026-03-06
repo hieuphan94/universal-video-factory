@@ -55,11 +55,6 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
     fs.readFileSync(metadataPath, "utf-8")
   );
 
-  // Intro/outro durations (in frames) — content starts after intro.
-  // Word frames, scene frames, clicks, and audio must all be offset by introDuration
-  // so they align with the content region in the composition timeline.
-  const INTRO_FRAMES = DEFAULT_INTRO_FRAMES;
-
   // Paths are relative to projectDir which is set as Remotion's publicDir.
   // Remotion serves them via http://localhost:PORT/<relative-path>
   const scenes: SceneTiming[] = metadata.scenes.map((s) => ({
@@ -72,13 +67,13 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
   // Offset word frames by intro duration so subtitles don't appear during intro
   const words: WordFrame[] = (timestamps.words ?? []).map((w) => ({
     word: w.word,
-    startFrame: secondsToFrames(w.start) + INTRO_FRAMES,
-    endFrame: secondsToFrames(w.end) + INTRO_FRAMES,
+    startFrame: secondsToFrames(w.start) + DEFAULT_INTRO_FRAMES,
+    endFrame: secondsToFrames(w.end) + DEFAULT_INTRO_FRAMES,
   }));
 
   // totalDurationFrames = full video length (intro + content + outro)
   const contentFrames = secondsToFrames(metadata.totalDuration);
-  const totalDurationFrames = INTRO_FRAMES + contentFrames + DEFAULT_OUTRO_FRAMES;
+  const totalDurationFrames = DEFAULT_INTRO_FRAMES + contentFrames + DEFAULT_OUTRO_FRAMES;
   const audioPath = `/${metadata.audioFile}`;
 
   // Generate click events from scene metadata (one click per scene with valid coordinates).

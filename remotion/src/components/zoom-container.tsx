@@ -48,8 +48,6 @@ export const ZoomContainer: React.FC<ZoomContainerProps> = ({
   let currentScale = 1.0;
   let originX = width / 2;
   let originY = height / 2;
-  let activeEventIdx = -1;
-
   for (let i = 0; i < zoomEvents.length; i++) {
     const event = zoomEvents[i];
     const targetScale = Math.min(event.scale, MAX_SCALE);
@@ -87,7 +85,6 @@ export const ZoomContainer: React.FC<ZoomContainerProps> = ({
     }
 
     currentScale = scale;
-    activeEventIdx = i;
 
     // Smooth pan: interpolate origin from previous event's focus point
     if (i > 0) {
