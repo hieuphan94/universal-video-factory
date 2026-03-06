@@ -137,12 +137,25 @@ export async function renderVideoWithProps(options: {
  * Remotion webpack bundle directory so they're accessible via the dev server.
  */
 function copyAssetsToBundle(projectDir: string, bundleDir: string): void {
+  // Copy subdirectories (audio/, scenes/)
   const dirs = ["audio", "scenes"];
   for (const dir of dirs) {
     const src = path.join(projectDir, dir);
     const dest = path.join(bundleDir, dir);
     if (fs.existsSync(src)) {
       fs.cpSync(src, dest, { recursive: true });
+    }
+  }
+  // Copy media files from project root (recording.mp4, *.webm, *.mp3)
+  const mediaExts = [".mp4", ".webm", ".mp3", ".wav"];
+  const entries = fs.readdirSync(projectDir);
+  for (const entry of entries) {
+    if (mediaExts.some((ext) => entry.endsWith(ext))) {
+      const src = path.join(projectDir, entry);
+      const dest = path.join(bundleDir, entry);
+      if (fs.statSync(src).isFile()) {
+        fs.copyFileSync(src, dest);
+      }
     }
   }
   console.log(`[render-engine] Copied assets to bundle`);
