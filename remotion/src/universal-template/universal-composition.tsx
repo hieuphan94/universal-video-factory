@@ -36,8 +36,8 @@ export const UniversalComposition: React.FC<UniversalTemplateProps> = ({
   outroDuration,
   cta,
   steps,
-  transitions,
-  memeInserts,
+  transitions = [],
+  memeInserts = [],
 }) => {
   const { width, height, durationInFrames } = useVideoConfig();
 
