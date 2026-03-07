@@ -1,5 +1,6 @@
 // Tutorial pipeline — chains all human-assisted phases into one flow:
-// generate-script → record (human) → detect → voice TTS → render → export
+// generate-script → voice TTS → record (human) → detect → render → export
+// Voice generated BEFORE recording so terminal typewriter matches TTS pacing.
 // Supports checkpoint/resume so human recording isn't lost on failure.
 
 import * as fs from "fs";
@@ -50,7 +51,7 @@ export interface TutorialPipelineResult {
   finalVideoPath: string;
 }
 
-/** Run the full tutorial pipeline: script → record → detect → voice → render → export */
+/** Run the full tutorial pipeline: script → voice → record → detect → render → export */
 export async function runTutorialPipeline(
   opts: TutorialPipelineOptions
 ): Promise<TutorialPipelineResult> {
@@ -98,85 +99,27 @@ export async function runTutorialPipeline(
     log.info(`Script: ${script.steps.length} steps → ${scriptPath}`);
   }
 
-  // Step 2: Human records screen
-  let recordingVideoPath: string;
-  let recordingEventsPath: string;
-  const markersPath = path.join(outputDir, "markers.json");
-
-  if (isPhaseComplete(checkpoint, "B")) {
-    const data = getPhaseData(checkpoint, "B") as { videoPath: string; eventsPath: string };
-    log.info("Step 2/5: skipped (checkpoint)");
-    // Verify recording files still exist on disk
-    if (!fs.existsSync(data.videoPath) || !fs.existsSync(data.eventsPath)) {
-      throw new Error(`[tutorial] Checkpoint says recording done but files missing: ${data.videoPath}`);
-    }
-    recordingVideoPath = data.videoPath;
-    recordingEventsPath = data.eventsPath;
-  } else {
-    // Match recording viewport to output quality
-    // 4k records at 1440p (max for most displays) and upscales during render
-    const viewportSizes: Record<string, { w: number; h: number }> = {
-      "1440p": { w: 2560, h: 1440 },
-      "4k": { w: 2560, h: 1440 },
-    };
-    const vp = opts.quality ? viewportSizes[opts.quality] : undefined;
-    log.info("Step 2/5: Recording screen (human-assisted)...");
-    if (vp) log.info(`Recording at ${vp.w}x${vp.h} (${opts.quality})`);
-    log.info("Press ` (backtick) to advance steps, ESC to stop recording.");
-    const recording = await recordHumanSession({
-      url, script, outputDir,
-      viewportWidth: vp?.w,
-      viewportHeight: vp?.h,
-    });
-    recordingVideoPath = recording.videoPath;
-    recordingEventsPath = recording.eventsPath;
-    await saveCheckpoint(outputDir, "B", {
-      videoPath: recording.videoPath,
-      eventsPath: recording.eventsPath,
-      sceneCount: recording.sceneCount,
-      durationMs: recording.durationMs,
-    });
-    log.info(`Recorded ${recording.sceneCount} scenes, ${recording.durationMs}ms`);
-  }
-
-  // Step 3: Detect markers
-  if (!isPhaseComplete(checkpoint, "C")) {
-    log.info("Step 3/5: Detecting markers...");
-    const eventsRaw = fs.readFileSync(recordingEventsPath, "utf-8");
-    const session: RecordingSession = JSON.parse(eventsRaw);
-    const markers = detectMarkers(session);
-    fs.writeFileSync(markersPath, JSON.stringify(markers, null, 2));
-    const zoomCount = markers.markers.filter((m) => m.type === "zoom").length;
-    await saveCheckpoint(outputDir, "C", { markersPath });
-    log.info(`${markers.markers.length} markers (${zoomCount} zooms)`);
-  } else {
-    log.info("Step 3/5: skipped (checkpoint)");
-  }
-
-  // Early exit if --skip-render
-  if (opts.skipRender) {
-    log.info("Skipping voice + render (--skip-render). Recording saved.");
-    return { scriptPath, recordingDir: outputDir, markersPath, finalVideoPath: "" };
-  }
-
-  // Step 4: Voice TTS (generate narration from script)
+  // Step 2: Voice TTS (generate narration BEFORE recording for typewriter sync)
   const audioDir = path.join(outputDir, "audio");
   let voiceAudioPath: string;
   let voiceTimestampsPath: string;
   let sceneAudioFiles: Array<{ sceneId: string; audioPath: string; durationSec: number; originalStartSec: number; originalEndSec: number }> = [];
+  let sceneDurationsSec: number[] = [];
 
-  if (isPhaseComplete(checkpoint, "D")) {
-    const data = getPhaseData(checkpoint, "D") as {
+  if (isPhaseComplete(checkpoint, "B")) {
+    const data = getPhaseData(checkpoint, "B") as {
       audioPath: string;
       timestampsPath: string;
       sceneAudioFiles?: typeof sceneAudioFiles;
+      sceneDurationsSec?: number[];
     };
-    log.info("Step 4/5: skipped (checkpoint)");
+    log.info("Step 2/5: skipped (checkpoint)");
     voiceAudioPath = data.audioPath;
     voiceTimestampsPath = data.timestampsPath;
     sceneAudioFiles = data.sceneAudioFiles ?? [];
+    sceneDurationsSec = data.sceneDurationsSec ?? [];
   } else {
-    log.info("Step 4/5: Generating voice...");
+    log.info("Step 2/5: Generating voice...");
     const narrationText = buildNarrationFromScript(script);
     fs.mkdirSync(audioDir, { recursive: true });
     const scriptTxtPath = path.join(audioDir, "script.txt");
@@ -192,13 +135,74 @@ export async function runTutorialPipeline(
     voiceAudioPath = voiceResult.audioPath;
     voiceTimestampsPath = voiceResult.timestampsPath;
     sceneAudioFiles = voiceResult.sceneAudioFiles;
-    await saveCheckpoint(outputDir, "D", {
+    sceneDurationsSec = voiceResult.sceneDurations.map((s) => s.durationSec);
+    await saveCheckpoint(outputDir, "B", {
       audioPath: voiceResult.audioPath,
       timestampsPath: voiceResult.timestampsPath,
       totalDuration: voiceResult.totalDuration,
       sceneAudioFiles: voiceResult.sceneAudioFiles,
+      sceneDurationsSec,
     });
     log.info(`Voice: ${voiceResult.totalDuration.toFixed(1)}s, ${sceneAudioFiles.length} scene audio(s)`);
+  }
+
+  // Step 3: Human records screen (typewriter paced by actual TTS durations)
+  let recordingVideoPath: string;
+  let recordingEventsPath: string;
+  const markersPath = path.join(outputDir, "markers.json");
+
+  if (isPhaseComplete(checkpoint, "C")) {
+    const data = getPhaseData(checkpoint, "C") as { videoPath: string; eventsPath: string };
+    log.info("Step 3/5: skipped (checkpoint)");
+    if (!fs.existsSync(data.videoPath) || !fs.existsSync(data.eventsPath)) {
+      throw new Error(`[tutorial] Checkpoint says recording done but files missing: ${data.videoPath}`);
+    }
+    recordingVideoPath = data.videoPath;
+    recordingEventsPath = data.eventsPath;
+  } else {
+    const viewportSizes: Record<string, { w: number; h: number }> = {
+      "1440p": { w: 2560, h: 1440 },
+      "4k": { w: 2560, h: 1440 },
+    };
+    const vp = opts.quality ? viewportSizes[opts.quality] : undefined;
+    log.info("Step 3/5: Recording screen (human-assisted)...");
+    if (vp) log.info(`Recording at ${vp.w}x${vp.h} (${opts.quality})`);
+    log.info("Press ` (backtick) to advance steps, ESC to stop recording.");
+    const recording = await recordHumanSession({
+      url, script, outputDir,
+      viewportWidth: vp?.w,
+      viewportHeight: vp?.h,
+      sceneDurationsSec,
+    });
+    recordingVideoPath = recording.videoPath;
+    recordingEventsPath = recording.eventsPath;
+    await saveCheckpoint(outputDir, "C", {
+      videoPath: recording.videoPath,
+      eventsPath: recording.eventsPath,
+      sceneCount: recording.sceneCount,
+      durationMs: recording.durationMs,
+    });
+    log.info(`Recorded ${recording.sceneCount} scenes, ${recording.durationMs}ms`);
+  }
+
+  // Step 4: Detect markers
+  if (!isPhaseComplete(checkpoint, "D")) {
+    log.info("Step 4/5: Detecting markers...");
+    const eventsRaw = fs.readFileSync(recordingEventsPath, "utf-8");
+    const session: RecordingSession = JSON.parse(eventsRaw);
+    const markers = detectMarkers(session);
+    fs.writeFileSync(markersPath, JSON.stringify(markers, null, 2));
+    const zoomCount = markers.markers.filter((m) => m.type === "zoom").length;
+    await saveCheckpoint(outputDir, "D", { markersPath });
+    log.info(`${markers.markers.length} markers (${zoomCount} zooms)`);
+  } else {
+    log.info("Step 4/5: skipped (checkpoint)");
+  }
+
+  // Early exit if --skip-render
+  if (opts.skipRender) {
+    log.info("Skipping render (--skip-render). Recording saved.");
+    return { scriptPath, recordingDir: outputDir, markersPath, finalVideoPath: "" };
   }
 
   // Step 5: Render with Remotion + export

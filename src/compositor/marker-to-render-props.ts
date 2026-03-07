@@ -125,14 +125,19 @@ export function mapMarkersToRenderProps(
       const sceneBoundaries: Array<{ start_time: number; end_time: number }> = wordsRaw.scenes;
       const allWords: Array<{ word: string; start: number; end: number }> = wordsRaw.words ?? [];
 
-      for (let si = 0; si < sceneBoundaries.length; si++) {
+      // Only map words for scenes that exist in both audio and video
+      const mappableScenes = Math.min(sceneBoundaries.length, scenes.length);
+      for (let si = 0; si < mappableScenes; si++) {
         const sb = sceneBoundaries[si];
         const scene = scenes[si];
         if (!scene || !sb) continue;
 
-        // Find words belonging to this scene (by time range in original audio)
+        // Find words belonging to this scene (by start time in original audio)
+        // Use next scene boundary to avoid bleeding words across scenes
+        const nextSb = sceneBoundaries[si + 1];
+        const sceneEndTime = nextSb ? nextSb.start_time : sb.end_time + 0.01;
         const sceneWords = allWords.filter(
-          (w) => w.start >= sb.start_time - 0.01 && w.end <= sb.end_time + 0.01
+          (w) => w.start >= sb.start_time - 0.001 && w.start < sceneEndTime
         );
 
         // Offset: word time relative to scene audio start → absolute frame in composition
