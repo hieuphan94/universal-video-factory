@@ -1,13 +1,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, spring } from "remotion";
 import { AnimatedText } from "./animated-text";
-
-interface BrandProps {
-  name: string;
-  logo?: string;
-  colors: { primary: string; accent: string };
-  tagline?: string;
-}
+import type { BrandProps } from "../universal-template/props-schema";
 
 interface IntroSequenceProps {
   brand?: BrandProps;

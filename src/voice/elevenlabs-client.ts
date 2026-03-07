@@ -5,6 +5,9 @@ import fs from "fs";
 import path from "path";
 import { type ElevenLabsVoice, type TTSOptions, type VoiceSettings } from "./types.js";
 import { withRetry } from "../utils/retry.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("elevenlabs");
 
 const BASE_URL = "https://api.elevenlabs.io";
 const DEFAULT_MODEL = "eleven_multilingual_v2";
@@ -140,7 +143,7 @@ export async function textToSpeechWithTimestamps(
       if (res.status === 422) {
         const detail = await res.text();
         if (detail.includes("quota") || detail.includes("character_limit")) {
-          console.error("[elevenlabs] Character quota exceeded. Upgrade plan or reduce text length.");
+          log.error("Character quota exceeded. Upgrade plan or reduce text length.");
         }
         throw new Error(`textToSpeech failed (422): ${detail}`);
       }
@@ -159,7 +162,7 @@ export async function textToSpeechWithTimestamps(
       const audioBuffer = Buffer.from(data.audio_base64, "base64");
       fs.mkdirSync(path.dirname(mp3Path), { recursive: true });
       fs.writeFileSync(mp3Path, audioBuffer);
-      console.log(`[elevenlabs] Saved audio → ${mp3Path}`);
+      log.info(`Saved audio → ${mp3Path}`);
 
       // Prefer normalized_alignment (post text-normalization) for accuracy
       const alignment = data.normalized_alignment ?? data.alignment;

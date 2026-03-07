@@ -299,14 +299,14 @@ npm run test:watch   # Watch mode
 - Log to both console (user-facing) and file (debugging)
 
 ```typescript
-import { getLogger } from "../utils/logger.js";
+import { createLogger } from "../utils/logger.js";
 
-const logger = getLogger("ai-director");
+const log = createLogger("ai-director");
 
-logger.info("Starting screenshot analysis", { imagePath, feature });
-logger.debug("Claude response:", { confidence, elements: elementCount });
-logger.warn("Low confidence element detected", { selector, confidence: 0.45 });
-logger.error("API failed", { error: err.message, attempt: 2 });
+log.info("Starting screenshot analysis");
+log.debug("Claude response received", confidence, elementCount);
+log.warn("Low confidence element detected");
+log.error("API failed", err.message);
 ```
 
 ### Log Levels

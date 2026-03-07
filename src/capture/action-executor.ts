@@ -2,6 +2,9 @@
 // Interprets natural-language action descriptions and executes Playwright commands.
 
 import type { Page, Locator } from "playwright";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("action-executor");
 
 // Delay after typing each character for natural typing appearance
 const TYPING_DELAY_MS = 100;
@@ -31,10 +34,10 @@ export async function executeAction(
   for (let attempt = 1; attempt <= retryAttempts; attempt++) {
     try {
       await executeSmartAction(page, action);
-      console.log(`[action-executor] Action executed (attempt ${attempt}): ${action.description}`);
+      log.info(`Action executed (attempt ${attempt}): ${action.description}`);
       return;
     } catch (err) {
-      console.warn(`[action-executor] Attempt ${attempt} failed: ${(err as Error).message}`);
+      log.warn(`Attempt ${attempt} failed: ${(err as Error).message}`);
       if (attempt === retryAttempts) throw err;
       await page.waitForTimeout(500);
     }
@@ -56,12 +59,12 @@ export async function executeMultiStepAction(
     return executeAction(page, action, retryAttempts);
   }
 
-  console.log(`[action-executor] Multi-step action: ${steps.length} steps`);
+  log.info(`Multi-step action: ${steps.length} steps`);
   for (let i = 0; i < steps.length; i++) {
     const stepDesc = steps[i].trim();
     if (!stepDesc) continue;
 
-    console.log(`[action-executor] Step ${i + 1}/${steps.length}: ${stepDesc}`);
+    log.info(`Step ${i + 1}/${steps.length}: ${stepDesc}`);
     const stepAction: ActionTarget = {
       ...action,
       description: stepDesc,

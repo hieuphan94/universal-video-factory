@@ -8,6 +8,9 @@ import { textToSpeechWithTimestamps } from "./elevenlabs-client.js";
 import type { ElevenLabsAlignment } from "./elevenlabs-client.js";
 import { mergeTimestamps, saveTimestamps } from "./timestamp-merger.js";
 import type { WordTimestamp } from "./types.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("voice");
 
 const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // ElevenLabs "Rachel" default
 
@@ -73,7 +76,7 @@ function alignmentToWordTimestamps(alignment: ElevenLabsAlignment): WordTimestam
     words.push({ word: currentWord, start: wordStart, end: wordEnd });
   }
 
-  console.log(`[voice] ElevenLabs alignment: ${words.length} word timestamp(s)`);
+  log.info(`ElevenLabs alignment: ${words.length} word timestamp(s)`);
   return words;
 }
 
@@ -94,13 +97,13 @@ export async function runVoicePipeline(
   // 1. Read and preprocess script
   const rawScript = fs.readFileSync(opts.scriptPath, "utf-8");
   const { cleanText, sceneMarkers } = preprocessScript(rawScript);
-  console.log(`[voice] Preprocessed script: ${sceneMarkers.length} scene(s), ${cleanText.split(/\s+/).length} words`);
+  log.info(`Preprocessed script: ${sceneMarkers.length} scene(s), ${cleanText.split(/\s+/).length} words`);
 
   // 2. Generate TTS audio with character-level alignment from ElevenLabs
   const audioDir = path.join(opts.outputDir, "audio");
   fs.mkdirSync(audioDir, { recursive: true });
   const audioPathHint = path.join(audioDir, "voiceover.wav");
-  console.log("[voice] Generating TTS audio with timestamps via ElevenLabs...");
+  log.info("Generating TTS audio with timestamps via ElevenLabs...");
   const ttsResult = await textToSpeechWithTimestamps(cleanText, voiceId, audioPathHint);
   const audioPath = ttsResult.outputPath; // actual path (may be .mp3)
 

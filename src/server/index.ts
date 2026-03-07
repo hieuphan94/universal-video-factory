@@ -12,6 +12,9 @@ import { initStore, closeStore } from "../queue/job-store.js";
 import { startRunner, stopRunner } from "../queue/job-runner.js";
 import { jobRoutes } from "./routes-jobs.js";
 import { addClient, broadcast } from "./websocket-hub.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("server");
 
 export function createServer(port = 3456) {
   const app = new Hono();
@@ -29,7 +32,7 @@ export function createServer(port = 3456) {
       }
       await next();
     });
-    console.log("[server] Auth enabled — VF_AUTH_TOKEN required for API access");
+    log.info("Auth enabled — VF_AUTH_TOKEN required for API access");
   }
 
   // Initialize SQLite store
@@ -70,19 +73,19 @@ export function createServer(port = 3456) {
 
   // Start HTTP server
   const server = serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
-    console.log(`[server] Dashboard running at http://localhost:${info.port}`);
+    log.info(`Dashboard running at http://localhost:${info.port}`);
   });
 
   // Attach WebSocket server to the same HTTP server
   const wss = new WebSocketServer({ server: server as unknown as import("http").Server, path: "/ws" });
   wss.on("connection", (ws) => {
     addClient(ws);
-    console.log("[ws] Client connected");
+    log.info("WebSocket client connected");
   });
 
   // Graceful shutdown
   const shutdown = () => {
-    console.log("\n[server] Shutting down...");
+    log.info("Shutting down...");
     stopRunner();
     wss.close();
     closeStore();

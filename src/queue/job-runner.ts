@@ -6,6 +6,9 @@ import * as fs from "fs";
 import { fileURLToPath } from "url";
 import { getNextQueued, updateJob } from "./job-store.js";
 import type { WorkerMessage, JobProgress } from "./types.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("runner");
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKER_PATH = path.join(__dirname, "job-worker.js");
@@ -40,7 +43,7 @@ export function startRunner(
     const now = new Date().toISOString();
     updateJob(job.id, { status: "running", startedAt: now });
 
-    console.log(`[runner] Starting job ${job.id}: ${job.config.url} — "${job.config.feature}"`);
+    log.info(`Starting job ${job.id}: ${job.config.url} — "${job.config.feature}"`);
 
     activeWorker = new Worker(WORKER_PATH, {
       workerData: { config: job.config, preview: false },
@@ -93,7 +96,7 @@ export function startRunner(
     });
 
     activeWorker.on("error", (err) => {
-      console.error(`[runner] Worker error for job ${job.id}:`, err.message);
+      log.error(`Worker error for job ${job.id}: ${err.message}`);
       updateJob(job.id, {
         status: "failed",
         error: err.message,
@@ -106,7 +109,7 @@ export function startRunner(
 
     activeWorker.on("exit", (code) => {
       if (code !== 0 && activeJobId === job.id) {
-        console.error(`[runner] Worker exited with code ${code} for job ${job.id}`);
+        log.error(`Worker exited with code ${code} for job ${job.id}`);
         updateJob(job.id, {
           status: "failed",
           error: `Worker exited with code ${code}`,
@@ -119,7 +122,7 @@ export function startRunner(
     });
   }, POLL_INTERVAL_MS);
 
-  console.log("[runner] Queue runner started");
+  log.info("Queue runner started");
 }
 
 /** Tail the pipeline.log for a job and emit new lines via onLog callback */
@@ -175,7 +178,7 @@ export function stopRunner(): void {
     activeWorker.terminate();
     cleanupWorker();
   }
-  console.log("[runner] Queue runner stopped");
+  log.info("Queue runner stopped");
 }
 
 /** Get the currently running job ID */

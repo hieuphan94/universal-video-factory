@@ -2,13 +2,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import { CtaCard } from "./cta-card";
 import { SocialLinksBar } from "./social-links-bar";
-
-interface BrandProps {
-  name: string;
-  logo?: string;
-  colors: { primary: string; accent: string };
-  tagline?: string;
-}
+import type { BrandProps } from "../universal-template/props-schema";
 
 interface CtaProps {
   text: string;

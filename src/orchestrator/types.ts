@@ -52,23 +52,6 @@ export interface CaptureResult {
   outputDir: string;
 }
 
-export interface VoiceResult {
-  audioPath: string;
-  timestamps: AudioTimestamp[];
-}
-
-export interface AudioTimestamp {
-  sceneIndex: number;
-  startMs: number;
-  endMs: number;
-  text: string;
-}
-
-export interface CompositorResult {
-  draftPath: string;
-  finalPath?: string;
-}
-
 export interface ExportPhaseResult {
   finalPath: string;
   encoder: string;
@@ -77,8 +60,6 @@ export interface ExportPhaseResult {
 
 export interface PipelineResult {
   capture?: CaptureResult;
-  voice?: VoiceResult;
-  compositor?: CompositorResult;
   export?: ExportPhaseResult;
   success: boolean;
   error?: string;

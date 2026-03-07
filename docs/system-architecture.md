@@ -235,7 +235,7 @@ Both pipelines share a common rendering layer (Remotion composition, ElevenLabs 
 #### 15. Utils (`src/utils/`)
 - **Purpose:** Shared utilities (logging, retry, cleanup)
 - **Key Files:**
-  - `logger.ts` — Structured JSON logging
+  - `logger.ts` — Structured logging (`[PHASE][LEVEL] message`)
   - `retry.ts` — Exponential backoff
   - `cleanup.ts` — Temp file cleanup
 - **Used by:** All modules
@@ -452,7 +452,7 @@ SCENE_FRAME_RATE = 30         // Render FPS (matches capture)
 - Graceful degradation: continue if optional features fail (e.g., tree-id enrichment)
 
 ### Logging
-- Structured JSON logs to `{output}/pipeline.log`
+- Structured logs (`[PHASE][LEVEL] message`) to `{output}/pipeline.log`
 - Console output with phase summaries
 - Error stack traces in logs only (not console)
 

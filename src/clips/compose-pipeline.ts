@@ -11,6 +11,9 @@ import { exportFinalVideo } from "../export/ffmpeg-exporter.js";
 import { loadBrand, toRemotion } from "../compositor/brand-loader.js";
 import type { ComposeManifest, ClipMetadata } from "./types.js";
 import type { PipelineResult } from "../orchestrator/types.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("compose");
 
 export interface ComposeOptions {
   manifest: ComposeManifest;
@@ -51,7 +54,7 @@ export async function runComposePipeline(opts: ComposeOptions): Promise<Pipeline
       }
       clips.push(clip);
     }
-    console.log(`[compose] Loaded ${clips.length} clip(s) from catalog`);
+    log.info(`Loaded ${clips.length} clip(s) from catalog`);
 
     // Step 2: Generate script.txt with [SCENE:XX] markers
     // Each scene gets a leading "..." pause so the viewer sees the screen
@@ -64,17 +67,17 @@ export async function runComposePipeline(opts: ComposeOptions): Promise<Pipeline
     // Trailing silence so content finishes before outro kicks in
     scriptLines.push("... ... ...");
     fs.writeFileSync(scriptPath, scriptLines.join("\n\n\n"), "utf-8");
-    console.log(`[compose] Generated script.txt (${manifest.clips.length} scenes)`);
+    log.info(`Generated script.txt (${manifest.clips.length} scenes)`);
 
     // Step 3: Voice TTS
-    console.log(`[compose] Running voice pipeline...`);
+    log.info("Running voice pipeline...");
     const voiceResult = await runVoicePipeline({
       scriptPath,
       outputDir,
       voiceId: manifest.voice,
       language: manifest.lang ?? "en",
     });
-    console.log(`[compose] Voice done: ${voiceResult.totalDuration.toFixed(1)}s total`);
+    log.info(`Voice done: ${voiceResult.totalDuration.toFixed(1)}s total`);
 
     // Step 4: Build capture_metadata.json
     const metadata = buildComposeMetadata(clips, voiceResult, outputDir);
@@ -86,10 +89,10 @@ export async function runComposePipeline(opts: ComposeOptions): Promise<Pipeline
       const destPath = path.join(scenesDir, destName);
       fs.copyFileSync(clips[i].videoPath, destPath);
     }
-    console.log(`[compose] Copied ${clips.length} clip(s) to scenes/`);
+    log.info(`Copied ${clips.length} clip(s) to scenes/`);
 
     // Step 6: Remotion render
-    console.log(`[compose] Rendering with Remotion...`);
+    log.info("Rendering with Remotion...");
     const draftPath = path.join(outputDir, "draft.mp4");
     const brand = await loadBrand(manifest.brand);
     toRemotion(brand);
@@ -101,13 +104,13 @@ export async function runComposePipeline(opts: ComposeOptions): Promise<Pipeline
     });
 
     // Step 7: FFmpeg export
-    console.log(`[compose] Exporting final video...`);
+    log.info("Exporting final video...");
     const suffix = opts.preview ? "720p" : "1080p";
     const finalPath = path.join(outputDir, `final_${suffix}.mp4`);
     const exportResult = await exportFinalVideo(draftPath, finalPath);
 
     const elapsedMs = Date.now() - startedAt;
-    console.log(`[compose] Done in ${(elapsedMs / 1000).toFixed(1)}s → ${finalPath}`);
+    log.info(`Done in ${(elapsedMs / 1000).toFixed(1)}s → ${finalPath}`);
 
     return {
       success: true,

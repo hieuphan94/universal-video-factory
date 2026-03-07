@@ -11,6 +11,9 @@ import type { BrowserConfig, SceneRecordingResult } from "./types.js";
 import { CursorTracker } from "./cursor-tracker.js";
 import { executeAction, waitForStability } from "./action-executor.js";
 import type { SceneDuration } from "../voice/voice-pipeline.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("scene-recorder");
 
 // Minimum buffer after action before scene ends (let result be visible)
 const POST_ACTION_BUFFER_MS = 1000;
@@ -72,8 +75,8 @@ export class SceneRecorder {
           ? sceneDurations[i].durationSec * 1000
           : 5000;
 
-        console.log(
-          `[SceneRecorder] Scene ${action.sceneIndex}: ${action.description} ` +
+        log.info(
+          `Scene ${action.sceneIndex}: ${action.description} ` +
           `(target: ${(narrationMs / 1000).toFixed(1)}s)`
         );
         const sceneStart = Date.now();
@@ -93,7 +96,7 @@ export class SceneRecorder {
           }
 
           const durationMs = Date.now() - sceneStart;
-          console.log(`[SceneRecorder] Scene ${String(action.sceneIndex).padStart(2, "0")} recorded (${(durationMs / 1000).toFixed(1)}s)`);
+          log.info(`Scene ${String(action.sceneIndex).padStart(2, "0")} recorded (${(durationMs / 1000).toFixed(1)}s)`);
           results.push({
             sceneIndex: action.sceneIndex,
             videoPath: "",
@@ -102,7 +105,7 @@ export class SceneRecorder {
           });
         } catch (err) {
           const errorMsg = (err as Error).message;
-          console.error(`[SceneRecorder] Scene ${action.sceneIndex} failed: ${errorMsg}`);
+          log.error(`Scene ${action.sceneIndex} failed: ${errorMsg}`);
           results.push({
             sceneIndex: action.sceneIndex,
             videoPath: "",
@@ -134,7 +137,7 @@ export class SceneRecorder {
     }
 
     const totalMs = Date.now() - sessionStart;
-    console.log(`[SceneRecorder] All ${results.length} scene(s) recorded in ${(totalMs / 1000).toFixed(1)}s`);
+    log.info(`All ${results.length} scene(s) recorded in ${(totalMs / 1000).toFixed(1)}s`);
 
     return results;
   }
@@ -157,7 +160,7 @@ export class SceneRecorder {
 
   /** Stagehand natural-language fallback for low-confidence actions */
   private async executeStagehandFallback(page: Page, action: PlannedAction): Promise<void> {
-    console.log(`[SceneRecorder] Using Stagehand fallback for: "${action.description}"`);
+    log.info(`Using Stagehand fallback for: "${action.description}"`);
     try {
       const { Stagehand } = await import("@browserbasehq/stagehand");
       const stagehand = new Stagehand({ env: "LOCAL", verbose: 0, enableCaching: false });
@@ -166,7 +169,7 @@ export class SceneRecorder {
       await stagehand.page.act(action.description);
       await stagehand.close();
     } catch (err) {
-      console.warn(`[SceneRecorder] Stagehand unavailable, using action-executor: ${(err as Error).message}`);
+      log.warn(`Stagehand unavailable, using action-executor: ${(err as Error).message}`);
       await executeAction(page, {
         x: action.x, y: action.y,
         selector: action.selector,

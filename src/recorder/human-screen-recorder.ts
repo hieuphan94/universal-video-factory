@@ -9,6 +9,9 @@ import { injectEventTrackers, flushEvents, reinjectAfterNavigation } from "./eve
 import { injectScriptOverlay, isRecordingDone, getSceneMarks } from "./script-overlay-injector.js";
 import type { TutorialScript } from "../script/script-types.js";
 import type { RecordingSession, RecordingResult, CursorEvent, SceneMarker } from "./recorder-types.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("recorder");
 
 const EVENT_FLUSH_INTERVAL_MS = 2000;
 const POLL_INTERVAL_MS = 500;
@@ -34,8 +37,8 @@ export async function recordHumanSession(opts: HumanRecorderOptions): Promise<Re
   const videoDir = path.join(opts.outputDir, "raw-recording");
   fs.mkdirSync(videoDir, { recursive: true });
 
-  console.log(`[recorder] Launching browser (${width}x${height})`);
-  console.log(`[recorder] Follow the script overlay. Press Space=next step, Esc=stop.`);
+  log.info(`Launching browser (${width}x${height})`);
+  log.info("Follow the script overlay. Press Space=next step, Esc=stop.");
 
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
@@ -51,7 +54,7 @@ export async function recordHumanSession(opts: HumanRecorderOptions): Promise<Re
 
   try {
     // Navigate to URL
-    console.log(`[recorder] Navigating to ${opts.url}`);
+    log.info(`Navigating to ${opts.url}`);
     await page.goto(opts.url, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1000);
 
@@ -73,7 +76,7 @@ export async function recordHumanSession(opts: HumanRecorderOptions): Promise<Re
     });
 
     // Periodic event flush + done check loop
-    console.log(`[recorder] Recording started. Perform the tutorial steps...`);
+    log.info("Recording started. Perform the tutorial steps...");
     while (true) {
       await page.waitForTimeout(POLL_INTERVAL_MS);
 
@@ -83,7 +86,7 @@ export async function recordHumanSession(opts: HumanRecorderOptions): Promise<Re
 
       // Check if human pressed Esc
       if (await isRecordingDone(page)) {
-        console.log(`[recorder] Recording stopped by user.`);
+        log.info("Recording stopped by user.");
         break;
       }
     }
@@ -115,7 +118,7 @@ export async function recordHumanSession(opts: HumanRecorderOptions): Promise<Re
     };
     const eventsPath = path.join(opts.outputDir, "events.json");
     fs.writeFileSync(eventsPath, JSON.stringify(session, null, 2), "utf-8");
-    console.log(`[recorder] Saved ${allEvents.length} events, ${scenes.length} scenes → ${eventsPath}`);
+    log.info(`Saved ${allEvents.length} events, ${scenes.length} scenes → ${eventsPath}`);
 
     // Convert webm → mp4
     const rawFiles = fs.readdirSync(videoDir);
@@ -124,13 +127,13 @@ export async function recordHumanSession(opts: HumanRecorderOptions): Promise<Re
 
     const webmPath = path.join(videoDir, webmFile);
     const mp4Path = path.join(opts.outputDir, "recording.mp4");
-    console.log(`[recorder] Converting webm → mp4`);
+    log.info("Converting webm → mp4");
     await convertWebmToMp4(webmPath, mp4Path);
 
     // Cleanup raw recording
     fs.rmSync(videoDir, { recursive: true, force: true });
 
-    console.log(`[recorder] Done: ${mp4Path} (${(durationMs / 1000).toFixed(1)}s)`);
+    log.info(`Done: ${mp4Path} (${(durationMs / 1000).toFixed(1)}s)`);
 
     return {
       videoPath: mp4Path,

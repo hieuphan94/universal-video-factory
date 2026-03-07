@@ -5,6 +5,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import * as fs from "fs";
 import * as path from "path";
 import { TutorialScriptSchema, type TutorialScript } from "./script-types.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("script-gen");
 
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 
@@ -33,8 +36,8 @@ export async function generateTutorialScript(
 
   const prompt = buildPrompt(opts.url, opts.purpose, lang, opts.content);
 
-  console.log(`[script-gen] Generating script for: ${opts.purpose}`);
-  console.log(`[script-gen] URL: ${opts.url}, lang: ${lang}`);
+  log.info(`Generating script for: ${opts.purpose}`);
+  log.info(`URL: ${opts.url}, lang: ${lang}`);
 
   const response = await client.messages.create({
     model,
@@ -48,7 +51,7 @@ export async function generateTutorialScript(
     .join("");
 
   const script = parseScriptResponse(rawText, lang);
-  console.log(`[script-gen] Generated ${script.steps.length} steps, ~${script.totalExpectedDurationSec}s total`);
+  log.info(`Generated ${script.steps.length} steps, ~${script.totalExpectedDurationSec}s total`);
 
   return script;
 }
@@ -58,7 +61,7 @@ export function saveTutorialScript(script: TutorialScript, outputPath: string): 
   const dir = path.dirname(outputPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify(script, null, 2), "utf-8");
-  console.log(`[script-gen] Saved → ${outputPath}`);
+  log.info(`Saved → ${outputPath}`);
 }
 
 function buildPrompt(url: string, purpose: string, lang: string, content?: string): string {

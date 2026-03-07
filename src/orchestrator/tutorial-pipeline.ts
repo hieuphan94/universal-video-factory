@@ -19,6 +19,9 @@ import {
 import type { RecordingSession } from "../recorder/recorder-types.js";
 import type { TutorialScript } from "../script/script-types.js";
 import { fetchTreeNode } from "../integrations/tree-id-client.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("tutorial");
 
 export interface TutorialPipelineOptions {
   url: string;
@@ -52,7 +55,7 @@ export async function runTutorialPipeline(
 
   if (checkpoint && opts.resume) {
     const done = checkpoint.completedPhases.map((p) => p.phase).join(", ");
-    console.log(`[tutorial] Resuming — already completed: ${done}`);
+    log.info(`Resuming — already completed: ${done}`);
   }
 
   // Step 0: Resolve tree-id content if provided
@@ -61,12 +64,12 @@ export async function runTutorialPipeline(
   let contentText: string | undefined;
 
   if (opts.treeId) {
-    console.log(`\n[tutorial] Fetching tree-id node: ${opts.treeId}`);
+    log.info(`Fetching tree-id node: ${opts.treeId}`);
     const node = await fetchTreeNode(opts.treeId, opts.treeIdSource ? { source: opts.treeIdSource } : undefined);
     url = url || node.url;
     purpose = purpose || node.title;
     contentText = `${node.title}\n\n${node.description}\n\nTags: ${node.tags.join(", ")}`;
-    console.log(`[tutorial] tree-id: "${node.title}" → ${node.url}`);
+    log.info(`tree-id: "${node.title}" → ${node.url}`);
   }
 
   // Step 1: Generate script
@@ -74,10 +77,10 @@ export async function runTutorialPipeline(
   const scriptPath = path.join(outputDir, "script.json");
 
   if (isPhaseComplete(checkpoint, "A")) {
-    console.log("[tutorial] Step 1/5: skipped (checkpoint)");
+    log.info("Step 1/5: skipped (checkpoint)");
     script = JSON.parse(fs.readFileSync(scriptPath, "utf-8"));
   } else {
-    console.log("\n[tutorial] Step 1/5: Generating script...");
+    log.info("Step 1/5: Generating script...");
     script = await generateTutorialScript({
       url,
       purpose,
@@ -86,7 +89,7 @@ export async function runTutorialPipeline(
     });
     fs.writeFileSync(scriptPath, JSON.stringify(script, null, 2));
     await saveCheckpoint(outputDir, "A", { scriptPath });
-    console.log(`[tutorial] Script: ${script.steps.length} steps → ${scriptPath}`);
+    log.info(`Script: ${script.steps.length} steps → ${scriptPath}`);
   }
 
   // Step 2: Human records screen
@@ -96,7 +99,7 @@ export async function runTutorialPipeline(
 
   if (isPhaseComplete(checkpoint, "B")) {
     const data = getPhaseData(checkpoint, "B") as { videoPath: string; eventsPath: string };
-    console.log("[tutorial] Step 2/5: skipped (checkpoint)");
+    log.info("Step 2/5: skipped (checkpoint)");
     // Verify recording files still exist on disk
     if (!fs.existsSync(data.videoPath) || !fs.existsSync(data.eventsPath)) {
       throw new Error(`[tutorial] Checkpoint says recording done but files missing: ${data.videoPath}`);
@@ -104,8 +107,8 @@ export async function runTutorialPipeline(
     recordingVideoPath = data.videoPath;
     recordingEventsPath = data.eventsPath;
   } else {
-    console.log("\n[tutorial] Step 2/5: Recording screen (human-assisted)...");
-    console.log("[tutorial] Press SPACE to advance steps, ESC to stop recording.");
+    log.info("Step 2/5: Recording screen (human-assisted)...");
+    log.info("Press SPACE to advance steps, ESC to stop recording.");
     const recording = await recordHumanSession({ url, script, outputDir });
     recordingVideoPath = recording.videoPath;
     recordingEventsPath = recording.eventsPath;
@@ -115,21 +118,21 @@ export async function runTutorialPipeline(
       sceneCount: recording.sceneCount,
       durationMs: recording.durationMs,
     });
-    console.log(`[tutorial] Recorded ${recording.sceneCount} scenes, ${recording.durationMs}ms`);
+    log.info(`Recorded ${recording.sceneCount} scenes, ${recording.durationMs}ms`);
   }
 
   // Step 3: Detect markers
   if (!isPhaseComplete(checkpoint, "C")) {
-    console.log("\n[tutorial] Step 3/5: Detecting markers...");
+    log.info("Step 3/5: Detecting markers...");
     const eventsRaw = fs.readFileSync(recordingEventsPath, "utf-8");
     const session: RecordingSession = JSON.parse(eventsRaw);
     const markers = detectMarkers(session);
     fs.writeFileSync(markersPath, JSON.stringify(markers, null, 2));
     const zoomCount = markers.markers.filter((m) => m.type === "zoom").length;
     await saveCheckpoint(outputDir, "C", { markersPath });
-    console.log(`[tutorial] ${markers.markers.length} markers (${zoomCount} zooms)`);
+    log.info(`${markers.markers.length} markers (${zoomCount} zooms)`);
   } else {
-    console.log("[tutorial] Step 3/5: skipped (checkpoint)");
+    log.info("Step 3/5: skipped (checkpoint)");
   }
 
   // Step 4: Voice TTS (generate narration from script)
@@ -139,11 +142,11 @@ export async function runTutorialPipeline(
 
   if (isPhaseComplete(checkpoint, "D")) {
     const data = getPhaseData(checkpoint, "D") as { audioPath: string; timestampsPath: string };
-    console.log("[tutorial] Step 4/5: skipped (checkpoint)");
+    log.info("Step 4/5: skipped (checkpoint)");
     voiceAudioPath = data.audioPath;
     voiceTimestampsPath = data.timestampsPath;
   } else {
-    console.log("\n[tutorial] Step 4/5: Generating voice...");
+    log.info("Step 4/5: Generating voice...");
     const narrationText = buildNarrationFromScript(script);
     fs.mkdirSync(audioDir, { recursive: true });
     const scriptTxtPath = path.join(audioDir, "script.txt");
@@ -163,14 +166,14 @@ export async function runTutorialPipeline(
       timestampsPath: voiceResult.timestampsPath,
       totalDuration: voiceResult.totalDuration,
     });
-    console.log(`[tutorial] Voice: ${voiceResult.totalDuration.toFixed(1)}s`);
+    log.info(`Voice: ${voiceResult.totalDuration.toFixed(1)}s`);
   }
 
   // Step 5: Render with Remotion + export
   const finalVideoPath = path.join(outputDir, "final.mp4");
 
   if (!isPhaseComplete(checkpoint, "E")) {
-    console.log("\n[tutorial] Step 5/5: Rendering video...");
+    log.info("Step 5/5: Rendering video...");
     const videoPath = `/${path.relative(outputDir, recordingVideoPath)}`;
     const audioPath = `/${path.relative(outputDir, voiceAudioPath)}`;
 
@@ -185,9 +188,9 @@ export async function runTutorialPipeline(
 
     await exportFinalVideo(rawVideoPath, finalVideoPath);
     await saveCheckpoint(outputDir, "E", { finalVideoPath });
-    console.log(`\n[tutorial] Done! → ${finalVideoPath}`);
+    log.info(`Done! → ${finalVideoPath}`);
   } else {
-    console.log("[tutorial] Step 5/5: skipped (checkpoint)");
+    log.info("Step 5/5: skipped (checkpoint)");
   }
 
   return { scriptPath, recordingDir: outputDir, markersPath, finalVideoPath };

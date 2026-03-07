@@ -2,25 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import type { SceneTiming, WordFrame, ClickEvent, RenderInputProps } from "./types.js";
 import { DEFAULT_INTRO_FRAMES, DEFAULT_OUTRO_FRAMES } from "./types.js";
+import type { CaptureMetadata } from "../capture/types.js";
 
 // Shape of words_timestamps.json
 interface WordsTimestampsFile {
   words: { word: string; start: number; end: number }[];
-}
-
-// Shape of capture_metadata.json
-interface CaptureMetadata {
-  scenes: {
-    id: string;
-    videoFile: string;
-    start: number;
-    end: number;
-    actionDescription?: string;
-    clickX?: number;
-    clickY?: number;
-  }[];
-  audioFile: string;
-  totalDuration: number;
 }
 
 const FPS = 30;
@@ -58,10 +44,10 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
   // Paths are relative to projectDir which is set as Remotion's publicDir.
   // Remotion serves them via http://localhost:PORT/<relative-path>
   const scenes: SceneTiming[] = metadata.scenes.map((s) => ({
-    id: s.id,
+    id: s.id ?? `SCENE:${String(s.index + 1).padStart(2, "0")}`,
     videoPath: `/${s.videoFile}`,
-    startFrame: secondsToFrames(s.start),
-    durationFrames: Math.max(1, secondsToFrames(s.end - s.start)),
+    startFrame: secondsToFrames(s.start ?? 0),
+    durationFrames: Math.max(1, secondsToFrames((s.end ?? 0) - (s.start ?? 0))),
   }));
 
   // Offset word frames by intro duration so subtitles don't appear during intro
@@ -72,9 +58,9 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
   }));
 
   // totalDurationFrames = full video length (intro + content + outro)
-  const contentFrames = secondsToFrames(metadata.totalDuration);
+  const contentFrames = secondsToFrames(metadata.totalDuration ?? 0);
   const totalDurationFrames = DEFAULT_INTRO_FRAMES + contentFrames + DEFAULT_OUTRO_FRAMES;
-  const audioPath = `/${metadata.audioFile}`;
+  const audioPath = `/${metadata.audioFile ?? "audio/voiceover.mp3"}`;
 
   // Generate click events from scene metadata (one click per scene with valid coordinates).
   // Each click appears 15 frames into the scene so the viewer sees the action context first.
@@ -83,7 +69,7 @@ export function mapProjectToRenderProps(projectDir: string): RenderInputProps {
     .map((s) => ({
       x: s.clickX!,
       y: s.clickY!,
-      frame: secondsToFrames(s.start) + 15,
+      frame: secondsToFrames(s.start ?? 0) + 15,
       duration: 30,
     }));
 

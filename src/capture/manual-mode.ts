@@ -4,6 +4,9 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as readline from "readline";
 import { chromium } from "playwright";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("manual-mode");
 
 export interface RecordedAction {
   type: "click" | "navigate" | "input" | "scroll";
@@ -75,11 +78,11 @@ export async function runManualRecording(
     }, true);
   `);
 
-  console.log(`[manual-mode] Browser opened. Navigate to: ${url}`);
+  log.info(`Browser opened. Navigate to: ${url}`);
   await page.goto(url);
 
-  console.log("[manual-mode] Perform the tutorial steps in the browser.");
-  console.log("[manual-mode] Press ENTER here when done recording...");
+  log.info("Perform the tutorial steps in the browser.");
+  log.info("Press ENTER here when done recording...");
 
   // Poll for clicks every 2 seconds while waiting for user
   let polling = true;
@@ -142,7 +145,7 @@ export async function runManualRecording(
 
   const clickPlanPath = path.join(outputDir, "click_plan.json");
   await fs.writeFile(clickPlanPath, JSON.stringify(clickPlan, null, 2), "utf-8");
-  console.log(`[manual-mode] Saved ${clickPlan.actions.length} action(s) → ${clickPlanPath}`);
+  log.info(`Saved ${clickPlan.actions.length} action(s) → ${clickPlanPath}`);
 
   return { actions, clickPlanPath };
 }

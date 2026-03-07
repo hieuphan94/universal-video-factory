@@ -6,6 +6,9 @@ import * as path from "path";
 import { chromium } from "playwright";
 import { executeMultiStepAction, waitForStability, resolveClickTarget } from "../capture/action-executor.js";
 import { convertWebmToMp4 } from "../export/ffmpeg-exporter.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("clip-recorder");
 
 const POST_ACTION_BUFFER_MS = 2000;
 
@@ -62,7 +65,7 @@ export async function recordClip(
 
   try {
     // Navigate to URL
-    console.log(`[clip-recorder] Navigating to ${opts.url}`);
+    log.info(`Navigating to ${opts.url}`);
     await page.goto(opts.url, { waitUntil: "domcontentloaded", timeout: pageLoadTimeout });
     await page.waitForTimeout(1000);
 
@@ -85,7 +88,7 @@ export async function recordClip(
     }
 
     // Execute the action (supports multi-step via "then" splitting)
-    console.log(`[clip-recorder] Executing: ${opts.action}`);
+    log.info(`Executing: ${opts.action}`);
     await executeMultiStepAction(page, actionTarget, 2);
     await waitForStability(page, actionTarget);
 
@@ -108,13 +111,13 @@ export async function recordClip(
 
   const webmPath = path.join(videoDir, webmFile);
   const mp4Path = path.join(outputDir, "clip.mp4");
-  console.log(`[clip-recorder] Converting webm → mp4`);
+  log.info("Converting webm → mp4");
   await convertWebmToMp4(webmPath, mp4Path);
 
   // Cleanup raw recording dir
   await fs.rm(videoDir, { recursive: true, force: true });
 
-  console.log(`[clip-recorder] Clip recorded: ${mp4Path} (${(durationMs / 1000).toFixed(1)}s)`);
+  log.info(`Clip recorded: ${mp4Path} (${(durationMs / 1000).toFixed(1)}s)`);
 
   return {
     videoPath: mp4Path,

@@ -4,6 +4,9 @@ import { chromium, Browser, BrowserContext, Page } from "playwright";
 import * as fs from "fs/promises";
 import * as path from "path";
 import type { BrowserConfig, CookieEntry } from "./types.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("browser-manager");
 
 export class BrowserManager {
   private config: BrowserConfig;
@@ -43,8 +46,8 @@ export class BrowserManager {
     this.page.setDefaultTimeout(this.config.clickActionTimeoutMs);
     this.page.setDefaultNavigationTimeout(this.config.pageLoadTimeoutMs);
 
-    console.log(
-      `[BrowserManager] Launched ${this.config.viewportWidth}x${this.config.viewportHeight} headless=${this.config.headless}`
+    log.info(
+      `Launched ${this.config.viewportWidth}x${this.config.viewportHeight} headless=${this.config.headless}`
     );
 
     return this.page;
@@ -64,7 +67,7 @@ export class BrowserManager {
       waitUntil: "networkidle",
       timeout: this.config.pageLoadTimeoutMs,
     });
-    console.log(`[BrowserManager] Navigated to ${url}`);
+    log.info(`Navigated to ${url}`);
   }
 
   /** Take a full-page screenshot, return the saved path */
@@ -93,7 +96,7 @@ export class BrowserManager {
     this.page = null;
     this.context = null;
     this.browser = null;
-    console.log("[BrowserManager] Browser closed.");
+    log.info("Browser closed.");
   }
 
   /** Read and inject cookies from JSON file — never logs cookie values, only count */
@@ -117,9 +120,9 @@ export class BrowserManager {
         }))
       );
 
-      console.log(`[BrowserManager] Injected ${cookies.length} cookie(s) from ${path.basename(cookiesPath)}`);
+      log.info(`Injected ${cookies.length} cookie(s) from ${path.basename(cookiesPath)}`);
     } catch (err) {
-      console.error(`[BrowserManager] Failed to inject cookies: ${(err as Error).message}`);
+      log.error(`Failed to inject cookies: ${(err as Error).message}`);
       throw err;
     }
   }

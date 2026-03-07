@@ -4,6 +4,9 @@ import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
 import { mapProjectToRenderProps } from "./scene-timing-mapper.js";
 import type { RenderOptions, RenderResult } from "./types.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("render-engine");
 
 // Path to the Remotion entry point (index file for Root.tsx)
 const REMOTION_ROOT = path.resolve(
@@ -31,7 +34,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
 
   const startMs = Date.now();
 
-  console.log(`[render-engine] Bundling Remotion composition...`);
+  log.info("Bundling Remotion composition...");
   const bundled = await bundle({
     entryPoint: REMOTION_ROOT,
     // Silence webpack progress spam during render
@@ -42,10 +45,10 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
   const absoluteProjectDir = path.resolve(projectDir);
   copyAssetsToBundle(absoluteProjectDir, bundled);
 
-  console.log(`[render-engine] Loading input props from ${projectDir}`);
+  log.info(`Loading input props from ${projectDir}`);
   const inputProps = mapProjectToRenderProps(projectDir);
 
-  console.log(`[render-engine] Selecting composition: ${COMPOSITION_ID}`);
+  log.info(`Selecting composition: ${COMPOSITION_ID}`);
   // Cast to satisfy @remotion/renderer's Record<string,unknown> constraint
   const props = inputProps as unknown as Record<string, unknown>;
 
@@ -55,9 +58,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
     inputProps: props,
   });
 
-  console.log(
-    `[render-engine] Rendering ${composition.durationInFrames} frames at ${composition.fps}fps`
-  );
+  log.info(`Rendering ${composition.durationInFrames} frames at ${composition.fps}fps`);
 
   await renderMedia({
     composition,
@@ -76,7 +77,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
   process.stdout.write("\n");
 
   const durationMs = Date.now() - startMs;
-  console.log(`[render-engine] Done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
+  log.info(`Done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
 
   return {
     outputPath,
@@ -97,7 +98,7 @@ export async function renderVideoWithProps(options: {
   const { projectDir, outputPath, inputProps, codec = "h264", concurrency = 4, onProgress } = options;
   const startMs = Date.now();
 
-  console.log(`[render-engine] Bundling Remotion composition...`);
+  log.info("Bundling Remotion composition...");
   const bundled = await bundle({ entryPoint: REMOTION_ROOT, onProgress: () => undefined });
 
   const absoluteProjectDir = path.resolve(projectDir);
@@ -109,7 +110,7 @@ export async function renderVideoWithProps(options: {
     inputProps,
   });
 
-  console.log(`[render-engine] Rendering ${composition.durationInFrames} frames at ${composition.fps}fps`);
+  log.info(`Rendering ${composition.durationInFrames} frames at ${composition.fps}fps`);
 
   await renderMedia({
     composition,
@@ -127,7 +128,7 @@ export async function renderVideoWithProps(options: {
 
   process.stdout.write("\n");
   const durationMs = Date.now() - startMs;
-  console.log(`[render-engine] Done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
+  log.info(`Done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
 
   return { outputPath, durationMs, framesRendered: composition.durationInFrames };
 }
@@ -158,5 +159,5 @@ function copyAssetsToBundle(projectDir: string, bundleDir: string): void {
       }
     }
   }
-  console.log(`[render-engine] Copied assets to bundle`);
+  log.info("Copied assets to bundle");
 }

@@ -3,6 +3,9 @@
 import { spawn } from "child_process";
 import * as fs from "fs/promises";
 import type { ExportOptions, ExportResult, ConvertResult } from "./types.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("ffmpeg");
 
 // --- FFmpeg availability check ---
 
@@ -67,7 +70,7 @@ export async function convertWebmToMp4(
   await ensureFfmpeg();
   const startMs = Date.now();
 
-  console.log(`[ffmpeg] Converting webm → mp4: ${inputPath}`);
+  log.info(`Converting webm → mp4: ${inputPath}`);
 
   const args = [
     "-y",               // overwrite without prompt
@@ -87,7 +90,7 @@ export async function convertWebmToMp4(
   if (stat.size === 0) throw new Error(`Converted file is empty: ${outputPath}`);
 
   const durationMs = Date.now() - startMs;
-  console.log(`[ffmpeg] Conversion done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
+  log.info(`Conversion done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
 
   return { outputPath, durationMs };
 }
@@ -117,30 +120,30 @@ export async function exportFinalVideo(
   const hwArgs = buildHevcArgs(draftPath, outputPath, videoBitrate, audioBitrate, "hevc_videotoolbox");
 
   try {
-    console.log("[ffmpeg] Encoding with hevc_videotoolbox (Metal)...");
+    log.info("Encoding with hevc_videotoolbox (Metal)...");
     await runFfmpeg(hwArgs, onProgress);
 
     const stat = await fs.stat(outputPath);
     if (stat.size === 0) throw new Error("Output file is empty after hw encode");
 
     const durationMs = Date.now() - startMs;
-    console.log(`[ffmpeg] HEVC export done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
+    log.info(`HEVC export done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
     return { outputPath, durationMs, encoder: "hevc_videotoolbox" };
 
   } catch (hwErr) {
-    console.warn(`[ffmpeg] hevc_videotoolbox failed (${(hwErr as Error).message.split("\n")[0]}), falling back to libx265...`);
+    log.warn(`hevc_videotoolbox failed (${(hwErr as Error).message.split("\n")[0]}), falling back to libx265...`);
   }
 
   // Fallback: software libx265
   const swArgs = buildHevcArgs(draftPath, outputPath, videoBitrate, audioBitrate, "libx265");
-  console.log("[ffmpeg] Encoding with libx265 (software)...");
+  log.info("Encoding with libx265 (software)...");
   await runFfmpeg(swArgs, onProgress);
 
   const stat = await fs.stat(outputPath);
   if (stat.size === 0) throw new Error("Output file is empty after sw encode");
 
   const durationMs = Date.now() - startMs;
-  console.log(`[ffmpeg] libx265 export done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
+  log.info(`libx265 export done in ${(durationMs / 1000).toFixed(1)}s → ${outputPath}`);
   return { outputPath, durationMs, encoder: "libx265" };
 }
 
