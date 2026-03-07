@@ -40,8 +40,8 @@ export async function recordHumanSession(opts: HumanRecorderOptions): Promise<Re
 
   // Save script steps as readable text file + print to terminal
   const stepsText = opts.script.steps
-    .map((s) => `${s.step}. ${s.instruction}  (~${s.expectedDurationSec}s)`)
-    .join("\n");
+    .map((s) => `${s.step}. ${s.instruction}  (~${s.expectedDurationSec}s)\n   🎙 "${s.narration}"`)
+    .join("\n\n");
   const stepsFilePath = path.join(opts.outputDir, "script-steps.txt");
   fs.writeFileSync(stepsFilePath, `${opts.script.title}\n${"─".repeat(55)}\n${stepsText}\n`, "utf-8");
   log.info(`Script saved → ${stepsFilePath}`);
@@ -51,6 +51,7 @@ export async function recordHumanSession(opts: HumanRecorderOptions): Promise<Re
   log.info("─".repeat(55));
   for (const step of opts.script.steps) {
     log.info(`  ${step.step}. ${step.instruction}  (~${step.expectedDurationSec}s)`);
+    log.info(`     🎙 "${step.narration}"`);
   }
   log.info("─".repeat(55));
   log.info("Press Esc in browser when done. ` (backtick) = mark step boundary.");
@@ -243,6 +244,9 @@ function printStepDisplay(
 
     out += `  \x1b[38;5;75m\x1b[1mStep ${stepIdx + 1} / ${total}\x1b[0m  \x1b[33m${elapsedSec}s\x1b[0m${totalStr}\n\n`;
     out += `  \x1b[1m→ ${step.instruction}\x1b[0m\n\n`;
+
+    // Show narration text — exact same text that will be spoken by TTS
+    out += `  \x1b[38;5;222m🎙 "${step.narration}"\x1b[0m\n\n`;
 
     const next = stepIdx + 1 < total ? steps[stepIdx + 1] : null;
     if (next) {
