@@ -41,9 +41,17 @@ export const SceneSchema = z.object({
   title: z.string().optional(),
 });
 
+// Sampled cursor position for smooth zoom tracking
+export const CursorSampleSchema = z.object({
+  ms: z.number(),
+  x: z.number(),
+  y: z.number(),
+});
+
 export const MarkersFileSchema = z.object({
   scenes: z.array(SceneSchema),
   markers: z.array(MarkerSchema),
+  cursorTrail: z.array(CursorSampleSchema).default([]),
 });
 
 export type ZoomMarker = z.infer<typeof ZoomMarkerSchema>;
@@ -51,4 +59,5 @@ export type HighlightMarker = z.infer<typeof HighlightMarkerSchema>;
 export type ClickMarker = z.infer<typeof ClickMarkerSchema>;
 export type Marker = z.infer<typeof MarkerSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
+export type CursorSample = z.infer<typeof CursorSampleSchema>;
 export type MarkersFile = z.infer<typeof MarkersFileSchema>;

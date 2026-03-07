@@ -5,7 +5,7 @@ import * as fs from "fs";
 import type { RecordingSession } from "../recorder/recorder-types.js";
 import { generateClickZooms } from "./click-zoom-generator.js";
 import { analyzeDwells } from "./dwell-analyzer.js";
-import type { Marker, MarkersFile, Scene } from "./detection-types.js";
+import type { Marker, MarkersFile, Scene, CursorSample } from "./detection-types.js";
 import { MarkersFileSchema } from "./detection-types.js";
 
 /** Run full detection pipeline: events.json → markers.json */
@@ -39,10 +39,31 @@ export function detectMarkers(session: RecordingSession): MarkersFile {
     return aMs - bMs;
   });
 
-  const result: MarkersFile = { scenes, markers };
+  // Sample cursor positions every ~200ms for smooth zoom tracking
+  const cursorTrail = sampleCursorTrail(session.events, 200);
+
+  const result: MarkersFile = { scenes, markers, cursorTrail };
 
   // Validate output with Zod schema
   return MarkersFileSchema.parse(result);
+}
+
+/** Sample cursor positions at regular intervals for smooth zoom tracking */
+function sampleCursorTrail(events: RecordingSession["events"], intervalMs: number): CursorSample[] {
+  const moveEvents = events.filter((e) => e.type === "move" || e.type === "click");
+  if (moveEvents.length === 0) return [];
+
+  const trail: CursorSample[] = [];
+  let nextSampleMs = 0;
+
+  for (const event of moveEvents) {
+    if (event.ms >= nextSampleMs) {
+      trail.push({ ms: event.ms, x: event.x, y: event.y });
+      nextSampleMs = event.ms + intervalMs;
+    }
+  }
+
+  return trail;
 }
 
 /** Load events.json, run detection, save markers.json */

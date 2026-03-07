@@ -14,8 +14,16 @@ interface ZoomEvent {
   duration: number;
 }
 
+interface CursorPoint {
+  frame: number;
+  x: number;
+  y: number;
+}
+
 interface ZoomContainerProps {
   zoomEvents: ZoomEvent[];
+  /** Sampled cursor positions — zoom follows cursor smoothly when available */
+  cursorTrail?: CursorPoint[];
   children: React.ReactNode;
 }
 
@@ -25,6 +33,33 @@ const SPRING_CFG = { damping: 20, stiffness: 120 };
 const TRANSITION_FRAMES = 15;
 // Frames to smoothly pan origin between consecutive zoom events
 const PAN_FRAMES = 20;
+
+/** Interpolate cursor position from trail samples using linear interpolation */
+function interpolateCursorPosition(
+  trail: CursorPoint[],
+  frame: number,
+): { x: number; y: number } {
+  // Before first sample
+  if (frame <= trail[0].frame) return { x: trail[0].x, y: trail[0].y };
+  // After last sample
+  const last = trail[trail.length - 1];
+  if (frame >= last.frame) return { x: last.x, y: last.y };
+
+  // Find bracketing samples and lerp
+  for (let i = 0; i < trail.length - 1; i++) {
+    const a = trail[i];
+    const b = trail[i + 1];
+    if (frame >= a.frame && frame <= b.frame) {
+      const t = b.frame === a.frame ? 0 : (frame - a.frame) / (b.frame - a.frame);
+      return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+      };
+    }
+  }
+
+  return { x: last.x, y: last.y };
+}
 
 /**
  * Wraps scene content with continuous spring-animated zoom.
@@ -38,6 +73,7 @@ const PAN_FRAMES = 20;
  */
 export const ZoomContainer: React.FC<ZoomContainerProps> = ({
   zoomEvents,
+  cursorTrail = [],
   children,
 }) => {
   const frame = useCurrentFrame();
@@ -90,24 +126,20 @@ export const ZoomContainer: React.FC<ZoomContainerProps> = ({
       }
     }
 
-    // Determine focus point — find latest active event and pan from previous
-    for (let i = zoomEvents.length - 1; i >= 0; i--) {
-      if (frame >= zoomEvents[i].frame) {
-        if (i > 0) {
-          const prev = zoomEvents[i - 1];
-          const panProgress = interpolate(
-            frame,
-            [zoomEvents[i].frame, zoomEvents[i].frame + PAN_FRAMES],
-            [0, 1],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-          );
-          originX = prev.x + (zoomEvents[i].x - prev.x) * panProgress;
-          originY = prev.y + (zoomEvents[i].y - prev.y) * panProgress;
-        } else {
+    // Determine focus point — follow cursor trail smoothly when available
+    if (cursorTrail.length >= 2) {
+      // Interpolate between nearest cursor trail samples
+      const pos = interpolateCursorPosition(cursorTrail, frame);
+      originX = pos.x;
+      originY = pos.y;
+    } else {
+      // Fallback: snap between zoom event positions
+      for (let i = zoomEvents.length - 1; i >= 0; i--) {
+        if (frame >= zoomEvents[i].frame) {
           originX = zoomEvents[i].x;
           originY = zoomEvents[i].y;
+          break;
         }
-        break;
       }
     }
   }

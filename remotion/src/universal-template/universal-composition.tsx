@@ -34,6 +34,7 @@ export const UniversalComposition: React.FC<UniversalTemplateProps> = ({
   introDuration,
   outroDuration,
   highlights = [],
+  cursorTrail = [],
   cta,
   steps,
 }) => {
@@ -120,7 +121,7 @@ export const UniversalComposition: React.FC<UniversalTemplateProps> = ({
           durationInFrames={contentDuration}
           name="content"
         >
-          <ZoomContainer zoomEvents={effectiveZoomEvents}>
+          <ZoomContainer zoomEvents={effectiveZoomEvents} cursorTrail={cursorTrail}>
             <ContinuousScreen
               videoPath={continuousVideoPath}
               width={width}

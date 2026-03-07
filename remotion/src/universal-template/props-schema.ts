@@ -43,6 +43,13 @@ const ZoomEventSchema = z.object({
   duration: z.number().int().positive(),
 });
 
+// Cursor position sample (for smooth zoom tracking)
+const CursorPointSchema = z.object({
+  frame: z.number().int().nonnegative(),
+  x: z.number(),
+  y: z.number(),
+});
+
 // Region highlight (dwell area)
 const HighlightEventSchema = z.object({
   startFrame: z.number().int().nonnegative(),
@@ -86,6 +93,9 @@ export const UniversalTemplatePropsSchema = z.object({
   // Region highlights (Phase 4 — dwell areas from markers.json)
   highlights: z.array(HighlightEventSchema).default([]),
 
+  // Cursor trail — sampled positions for smooth zoom tracking
+  cursorTrail: z.array(CursorPointSchema).default([]),
+
   // PiP overlays (Phase 5)
   // steps mirrors scenes but carries display labels; totalScenes = scenes.length
   steps: z.array(StepSchema).default([]),
@@ -99,4 +109,5 @@ export type ClickProps = z.infer<typeof ClickSchema>;
 export type ZoomEventProps = z.infer<typeof ZoomEventSchema>;
 export type CtaProps = z.infer<typeof CtaSchema>;
 export type HighlightEventProps = z.infer<typeof HighlightEventSchema>;
+export type CursorPointProps = z.infer<typeof CursorPointSchema>;
 export type StepProps = z.infer<typeof StepSchema>;

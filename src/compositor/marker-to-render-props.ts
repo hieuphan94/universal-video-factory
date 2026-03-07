@@ -31,9 +31,16 @@ export interface MarkerHighlightEvent {
   h: number;
 }
 
+export interface MarkerCursorPoint {
+  frame: number;
+  x: number;
+  y: number;
+}
+
 export interface MarkerRenderProps extends RenderInputProps {
   zoomEvents: MarkerZoomEvent[];
   highlights: MarkerHighlightEvent[];
+  cursorTrail: MarkerCursorPoint[];
 }
 
 /** Load markers.json and convert to frame-based render props */
@@ -100,6 +107,13 @@ export function mapMarkersToRenderProps(
     }));
   }
 
+  // Cursor trail → frame-based
+  const cursorTrail: MarkerCursorPoint[] = (markers.cursorTrail ?? []).map((c) => ({
+    frame: msToFrames(c.ms),
+    x: c.x,
+    y: c.y,
+  }));
+
   // Total duration = last scene end + outro
   const lastScene = markers.scenes[markers.scenes.length - 1];
   const contentFrames = lastScene ? msToFrames(lastScene.endMs) : 0;
@@ -116,5 +130,6 @@ export function mapMarkersToRenderProps(
     clicks,
     zoomEvents,
     highlights,
+    cursorTrail,
   };
 }
