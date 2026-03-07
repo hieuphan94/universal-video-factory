@@ -1,6 +1,7 @@
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
+import * as readline from "readline";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
 import { mapProjectToRenderProps } from "./scene-timing-mapper.js";
@@ -15,18 +16,57 @@ const CRITICAL_RAM_MB = 512;
 /** How often to check RAM during render (ms) */
 const RAM_CHECK_INTERVAL_MS = 3000;
 
-/** Get safe concurrency based on available system memory */
-function safeConcurrency(requested: number): number {
+/** Prompt user for a choice via stdin (CLI-friendly) */
+async function promptUser(message: string, choices: string[]): Promise<number> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  const choiceText = choices.map((c, i) => `  ${i + 1}) ${c}`).join("\n");
+  return new Promise((resolve) => {
+    rl.question(`\n⚠️  ${message}\n${choiceText}\nChoice [1-${choices.length}]: `, (answer) => {
+      rl.close();
+      const idx = parseInt(answer, 10) - 1;
+      resolve(idx >= 0 && idx < choices.length ? idx : 0);
+    });
+  });
+}
+
+/** Get safe concurrency based on available system memory. Prompts user when RAM is low. */
+async function safeConcurrency(requested: number): Promise<number> {
   const freeMB = Math.round(os.freemem() / 1024 / 1024);
+
   if (freeMB < CRITICAL_RAM_MB) {
-    throw new Error(
-      `Cannot render: only ${freeMB}MB RAM free (need >${CRITICAL_RAM_MB}MB). Close other apps and retry.`
+    const choice = await promptUser(
+      `RAM critically low: ${freeMB}MB free (need >${CRITICAL_RAM_MB}MB).`,
+      [
+        "Wait (close other apps, then press Enter to re-check)",
+        "Abort render",
+      ]
     );
+    if (choice === 1) {
+      throw new Error("Render aborted by user: insufficient RAM.");
+    }
+    // User chose to wait — re-check
+    return safeConcurrency(requested);
   }
+
   if (freeMB < LOW_RAM_MB) {
-    log.warn(`Low RAM: ${freeMB}MB free. Forcing concurrency=1 to prevent freeze.`);
+    const choice = await promptUser(
+      `Low RAM: ${freeMB}MB free (recommended: ${LOW_RAM_MB}MB).`,
+      [
+        `Continue with concurrency=1 (slower but safe)`,
+        "Wait (close other apps, then press Enter to re-check)",
+        "Abort render",
+      ]
+    );
+    if (choice === 2) {
+      throw new Error("Render aborted by user: insufficient RAM.");
+    }
+    if (choice === 1) {
+      return safeConcurrency(requested); // re-check after user frees RAM
+    }
+    log.warn(`Proceeding with concurrency=1 (${freeMB}MB free)`);
     return 1;
   }
+
   log.info(`Available RAM: ${freeMB}MB — using concurrency=${requested}`);
   return requested;
 }
@@ -97,7 +137,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
     inputProps: props,
   });
 
-  const actualConcurrency = safeConcurrency(concurrency);
+  const actualConcurrency = await safeConcurrency(concurrency);
   log.info(`Rendering ${composition.durationInFrames} frames at ${composition.fps}fps`);
 
   // Monitor RAM during render — abort if critically low
@@ -168,7 +208,7 @@ export async function renderVideoWithProps(options: {
     inputProps,
   });
 
-  const actualConcurrency = safeConcurrency(concurrency);
+  const actualConcurrency = await safeConcurrency(concurrency);
   log.info(`Rendering ${composition.durationInFrames} frames at ${composition.fps}fps`);
 
   let abortController: AbortController | undefined;

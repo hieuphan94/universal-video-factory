@@ -95,20 +95,17 @@ describe("render-engine", () => {
       codec: "h265",
       concurrency: 8,
     });
-    expect(renderMedia).toHaveBeenCalledWith(
-      expect.objectContaining({
-        codec: "h265",
-        outputLocation: "/tmp/out.mp4",
-        concurrency: 8,
-      })
-    );
+    const call = vi.mocked(renderMedia).mock.calls[0][0] as any;
+    expect(call.codec).toBe("h265");
+    expect(call.outputLocation).toBe("/tmp/out.mp4");
+    expect(call.concurrency).toBe(8);
   });
 
   it("uses default codec=h264 and concurrency=2", async () => {
     await renderVideo({ projectDir: "/tmp/project", outputPath: "/tmp/out.mp4" });
-    expect(renderMedia).toHaveBeenCalledWith(
-      expect.objectContaining({ codec: "h264", concurrency: 2 })
-    );
+    const call = vi.mocked(renderMedia).mock.calls[0][0] as any;
+    expect(call.codec).toBe("h264");
+    expect(call.concurrency).toBe(2);
   });
 
   it("returns RenderResult with outputPath and framesRendered", async () => {
