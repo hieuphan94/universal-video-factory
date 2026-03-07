@@ -146,7 +146,7 @@ export async function exportFinalVideo(
 
 // --- Helpers ---
 
-function buildHevcArgs(
+export function buildHevcArgs(
   input: string,
   output: string,
   videoBitrate: string,

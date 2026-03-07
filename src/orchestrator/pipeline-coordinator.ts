@@ -163,14 +163,20 @@ export class PipelineCoordinator {
       }
 
       // ── Phase F: FFmpeg HEVC export ──
-      this.opts.progress?.startPhase("F", "FFmpeg export");
-      const t = Date.now();
       const suffix = this.opts.preview ? "720p" : "1080p";
       const finalPath = path.join(dirs.output, `final_${suffix}.mp4`);
-      const exportResult = await exportFinalVideo(draftPath, finalPath);
-      await saveCheckpoint(dirs.output, "F", { finalPath });
-      this.opts.progress?.completePhase("F");
-      console.log(`[Pipeline] Phase F (export/${exportResult.encoder}) done in ${((Date.now() - t) / 1000).toFixed(1)}s`);
+      let exportPhase: ExportPhaseResult = { finalPath, encoder: "checkpoint", durationMs: 0 };
+      if (!isPhaseComplete(checkpoint, "F")) {
+        this.opts.progress?.startPhase("F", "FFmpeg export");
+        const t = Date.now();
+        const exportResult = await exportFinalVideo(draftPath, finalPath);
+        exportPhase = { finalPath, encoder: exportResult.encoder, durationMs: exportResult.durationMs };
+        await saveCheckpoint(dirs.output, "F", { finalPath });
+        this.opts.progress?.completePhase("F");
+        console.log(`[Pipeline] Phase F (export/${exportResult.encoder}) done in ${((Date.now() - t) / 1000).toFixed(1)}s`);
+      } else {
+        console.log("[Pipeline] Phase F: skipped (checkpoint)");
+      }
 
       await this.cleanupTemp(dirs.temp);
 
@@ -179,7 +185,7 @@ export class PipelineCoordinator {
 
       return {
         capture: captureResult,
-        export: { finalPath, encoder: exportResult.encoder, durationMs: exportResult.durationMs },
+        export: exportPhase,
         success: true,
         elapsedMs,
       };

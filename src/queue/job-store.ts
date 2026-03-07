@@ -12,12 +12,16 @@ const DB_PATH = path.join(DB_DIR, "video-factory.db");
 
 let db: Database.Database | null = null;
 
-/** Initialize SQLite database and create tables */
-export function initStore(): Database.Database {
+/** Initialize SQLite database and create tables. Pass ":memory:" for testing. */
+export function initStore(dbPath?: string): Database.Database {
   if (db) return db;
 
-  fs.mkdirSync(DB_DIR, { recursive: true });
-  db = new Database(DB_PATH);
+  const resolvedPath = dbPath ?? DB_PATH;
+  if (resolvedPath !== ":memory:") {
+    const dir = path.dirname(resolvedPath);
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  db = new Database(resolvedPath);
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 5000");
   db.pragma("foreign_keys = ON");
@@ -169,4 +173,9 @@ export function closeStore(): void {
     db.close();
     db = null;
   }
+}
+
+/** Reset store for testing — close db and clear singleton so initStore can be called again */
+export function resetStore(): void {
+  closeStore();
 }
