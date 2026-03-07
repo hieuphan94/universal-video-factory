@@ -9,15 +9,20 @@ import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("render-engine");
 
-/** Minimum free RAM (MB) required to render. Below this → concurrency=1. */
-const MIN_FREE_RAM_MB = 2048;
+/** Below this → concurrency=1. Below CRITICAL → abort render. */
+const LOW_RAM_MB = 2048;
+const CRITICAL_RAM_MB = 512;
 
 /** Get safe concurrency based on available system memory */
 function safeConcurrency(requested: number): number {
-  const freeBytes = os.freemem();
-  const freeMB = Math.round(freeBytes / 1024 / 1024);
-  if (freeMB < MIN_FREE_RAM_MB) {
-    log.warn(`Low RAM: ${freeMB}MB free (need ${MIN_FREE_RAM_MB}MB). Forcing concurrency=1 to prevent freeze.`);
+  const freeMB = Math.round(os.freemem() / 1024 / 1024);
+  if (freeMB < CRITICAL_RAM_MB) {
+    throw new Error(
+      `Cannot render: only ${freeMB}MB RAM free (need >${CRITICAL_RAM_MB}MB). Close other apps and retry.`
+    );
+  }
+  if (freeMB < LOW_RAM_MB) {
+    log.warn(`Low RAM: ${freeMB}MB free. Forcing concurrency=1 to prevent freeze.`);
     return 1;
   }
   log.info(`Available RAM: ${freeMB}MB — using concurrency=${requested}`);
