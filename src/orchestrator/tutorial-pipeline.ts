@@ -209,7 +209,13 @@ export async function runTutorialPipeline(
     const videoPath = `/${path.relative(outputDir, recordingVideoPath)}`;
     const audioPath = `/${path.relative(outputDir, voiceAudioPath)}`;
 
-    const renderProps = mapMarkersToRenderProps(markersPath, videoPath, audioPath, voiceTimestampsPath, sceneAudioFiles);
+    // Convert absolute scene audio paths to relative (Remotion serves from project dir)
+    const relativeSceneAudioFiles = sceneAudioFiles.map((sa) => ({
+      ...sa,
+      audioPath: `/${path.relative(outputDir, sa.audioPath)}`,
+    }));
+
+    const renderProps = mapMarkersToRenderProps(markersPath, videoPath, audioPath, voiceTimestampsPath, relativeSceneAudioFiles);
     const rawVideoPath = path.join(outputDir, "raw-render.mp4");
 
     await renderVideoWithProps({
