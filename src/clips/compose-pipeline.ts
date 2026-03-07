@@ -100,7 +100,7 @@ export async function runComposePipeline(opts: ComposeOptions): Promise<Pipeline
       projectDir: outputDir,
       outputPath: draftPath,
       codec: "h264",
-      concurrency: 4,
+      concurrency: 2,
     });
 
     // Step 7: FFmpeg export

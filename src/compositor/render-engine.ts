@@ -28,7 +28,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
     projectDir,
     outputPath,
     codec = "h264",
-    concurrency = 4,
+    concurrency = 2,
     onProgress,
   } = options;
 
@@ -95,7 +95,7 @@ export async function renderVideoWithProps(options: {
   concurrency?: number;
   onProgress?: (progress: number) => void;
 }): Promise<RenderResult> {
-  const { projectDir, outputPath, inputProps, codec = "h264", concurrency = 4, onProgress } = options;
+  const { projectDir, outputPath, inputProps, codec = "h264", concurrency = 2, onProgress } = options;
   const startMs = Date.now();
 
   log.info("Bundling Remotion composition...");

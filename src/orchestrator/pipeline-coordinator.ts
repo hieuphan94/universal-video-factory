@@ -153,7 +153,7 @@ export class PipelineCoordinator {
           projectDir: dirs.output,
           outputPath: draftPath,
           codec: "h264",
-          concurrency: 4,
+          concurrency: 2,
         });
         await saveCheckpoint(dirs.output, "E", { draftPath });
         this.opts.progress?.completePhase("E");
