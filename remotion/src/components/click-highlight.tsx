@@ -34,7 +34,7 @@ export const ClickHighlight: React.FC<ClickHighlightProps> = ({
   x,
   y,
   startFrame,
-  color = "#FFD700",
+  color = "#FF3B30",
   size = 40,
 }) => {
   const frame = useCurrentFrame();
@@ -79,7 +79,7 @@ export const ClickHighlight: React.FC<ClickHighlightProps> = ({
   const ring1Opacity = interpolate(ring1Progress, [0, 0.5, 1], [0, 0.8, 0.4]) * fadeOut;
   const ring2Opacity = interpolate(ring2Progress, [0, 0.5, 1], [0, 0.5, 0.15]) * fadeOut;
 
-  const dotRadius = 6;
+  const dotRadius = 10;
 
   return (
     <svg
@@ -97,9 +97,9 @@ export const ClickHighlight: React.FC<ClickHighlightProps> = ({
       <circle
         cx={x}
         cy={y}
-        r={16}
+        r={24}
         fill={color}
-        opacity={0.25 * dotScale * fadeOut}
+        opacity={0.3 * dotScale * fadeOut}
         filter="url(#clickGlow)"
       />
 
