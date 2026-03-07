@@ -55,56 +55,82 @@ export function mapMarkersToRenderProps(
   const markersRaw = JSON.parse(fs.readFileSync(markersPath, "utf-8"));
   const markers: MarkersFile = MarkersFileSchema.parse(markersRaw);
 
-  // Build scene-audio lookup by scene number (e.g. "SCENE:01" → audioPath)
-  const sceneAudioMap = new Map<string, string>();
+  // Build scene-audio lookup by scene number (e.g. "SCENE:01" → audioPath + duration)
+  const sceneAudioMap = new Map<string, { path: string; durationFrames: number }>();
   if (sceneAudioFiles) {
     for (const sa of sceneAudioFiles) {
-      // Extract scene number from "SCENE:01" → "01"
       const num = sa.sceneId.replace("SCENE:", "");
-      sceneAudioMap.set(num, sa.audioPath);
+      sceneAudioMap.set(num, {
+        path: sa.audioPath,
+        durationFrames: Math.ceil(sa.durationSec * FPS),
+      });
     }
   }
 
   // Scenes → frame-based, offset by intro
-  const scenes: SceneTiming[] = markers.scenes.map((s) => {
+  // Scene duration = max(video recording duration, audio narration duration)
+  // so voice is never cut short even if user advanced quickly.
+  // startFrame is recalculated when scenes extend to avoid overlap.
+  const scenes: SceneTiming[] = [];
+  let currentFrame = 0;
+  for (const s of markers.scenes) {
     const sceneNum = String(s.id).padStart(2, "0");
-    return {
+    const audio = sceneAudioMap.get(sceneNum);
+    const videoDurationFrames = Math.max(1, msToFrames(s.endMs - s.startMs));
+    const audioDurationFrames = audio?.durationFrames ?? 0;
+    const effectiveDuration = Math.max(videoDurationFrames, audioDurationFrames);
+    scenes.push({
       id: `scene-${sceneNum}`,
       videoPath,
-      startFrame: msToFrames(s.startMs),
-      durationFrames: Math.max(1, msToFrames(s.endMs - s.startMs)),
-      audioPath: sceneAudioMap.get(sceneNum),
-    };
-  });
+      startFrame: currentFrame,
+      durationFrames: effectiveDuration,
+      audioPath: audio?.path,
+    });
+    currentFrame += effectiveDuration;
+  }
 
-  // Click markers → ClickEvent props
-  // No intro offset — these render inside <Sequence from={introDuration}>,
-  // so useCurrentFrame() is already relative to content start
+  // Remap frame from original recording timeline to adjusted timeline
+  // (accounts for scenes extended to fit longer voice narration)
+  function remapFrame(originalFrame: number): number {
+    for (let i = 0; i < markers.scenes.length; i++) {
+      const ms = markers.scenes[i];
+      const scene = scenes[i];
+      if (!ms || !scene) break;
+      const origStart = msToFrames(ms.startMs);
+      const origEnd = msToFrames(ms.endMs);
+      if (originalFrame >= origStart && originalFrame < origEnd) {
+        return scene.startFrame + (originalFrame - origStart);
+      }
+    }
+    return originalFrame;
+  }
+
+  // Click markers → ClickEvent props (remapped to adjusted timeline)
   const clicks: ClickEvent[] = markers.markers
     .filter((m) => m.type === "click")
     .map((m) => ({
       x: m.x,
       y: m.y,
-      frame: msToFrames(m.ms),
+      frame: remapFrame(msToFrames(m.ms)),
       duration: 30,
     }));
 
-  // Zoom markers → ZoomEvent props (no intro offset — inside content Sequence)
+  // Zoom markers → ZoomEvent props (remapped to adjusted timeline)
   const zoomEvents: MarkerZoomEvent[] = markers.markers
     .filter((m) => m.type === "zoom")
     .map((m) => ({
-      frame: msToFrames(m.startMs),
+      frame: remapFrame(msToFrames(m.startMs)),
       x: m.x,
       y: m.y,
       scale: m.scale,
       duration: Math.max(1, msToFrames(m.endMs - m.startMs)),
     }));
 
-  // Highlight markers → frame-based (no intro offset — inside content Sequence)
+  // Highlight markers → frame-based (remapped to adjusted timeline)
   const highlights: MarkerHighlightEvent[] = markers.markers
     .filter((m) => m.type === "highlight")
     .map((m) => ({
-      startFrame: msToFrames(m.startMs),
+      startFrame: remapFrame(msToFrames(m.startMs)),
       durationFrames: Math.max(1, msToFrames(m.endMs - m.startMs)),
       x: m.x,
       y: m.y,
@@ -162,16 +188,15 @@ export function mapMarkersToRenderProps(
     }
   }
 
-  // Cursor trail → frame-based
+  // Cursor trail → remapped to adjusted scene timeline
   const cursorTrail: MarkerCursorPoint[] = (markers.cursorTrail ?? []).map((c) => ({
-    frame: msToFrames(c.ms),
+    frame: remapFrame(msToFrames(c.ms)),
     x: c.x,
     y: c.y,
   }));
 
-  // Total duration = last scene end + outro
-  const lastScene = markers.scenes[markers.scenes.length - 1];
-  const contentFrames = lastScene ? msToFrames(lastScene.endMs) : 0;
+  // Total duration = sum of all scene durations (which may be extended for voice) + outro
+  const contentFrames = currentFrame;
   const totalDurationFrames = DEFAULT_INTRO_FRAMES + contentFrames + DEFAULT_OUTRO_FRAMES;
 
   return {
