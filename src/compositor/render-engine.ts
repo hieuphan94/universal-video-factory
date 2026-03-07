@@ -3,7 +3,10 @@ import * as os from "os";
 import * as fs from "fs";
 import * as readline from "readline";
 import { bundle } from "@remotion/bundler";
-import { renderMedia, selectComposition } from "@remotion/renderer";
+import { renderMedia, selectComposition, makeCancelSignal } from "@remotion/renderer";
+
+// Persistent bundle cache dir — avoids re-bundling on every render (~2-3GB RAM spike)
+const BUNDLE_CACHE_DIR = path.resolve(os.tmpdir(), "video-factory-bundle-cache");
 import { mapProjectToRenderProps } from "./scene-timing-mapper.js";
 import type { RenderOptions, RenderResult } from "./types.js";
 import { createLogger } from "../utils/logger.js";
@@ -31,6 +34,10 @@ async function promptUser(message: string, choices: string[]): Promise<number> {
 
 /** Get safe concurrency based on available system memory. Prompts user when RAM is low. */
 async function safeConcurrency(requested: number): Promise<number> {
+  if (process.env["VF_SKIP_RAM_CHECK"]) {
+    log.warn("RAM check skipped (VF_SKIP_RAM_CHECK). Using concurrency=1.");
+    return 1;
+  }
   const freeMB = Math.round(os.freemem() / 1024 / 1024);
 
   if (freeMB < CRITICAL_RAM_MB) {
@@ -77,6 +84,7 @@ async function safeConcurrency(requested: number): Promise<number> {
  * Returns a cleanup function to stop monitoring.
  */
 function startRamMonitor(onCritical: () => void): () => void {
+  if (process.env["VF_SKIP_RAM_CHECK"]) return () => {};
   const timer = setInterval(() => {
     const freeMB = Math.round(os.freemem() / 1024 / 1024);
     if (freeMB < CRITICAL_RAM_MB) {
@@ -116,8 +124,8 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
   log.info("Bundling Remotion composition...");
   const bundled = await bundle({
     entryPoint: REMOTION_ROOT,
-    // Silence webpack progress spam during render
     onProgress: () => undefined,
+    outDir: BUNDLE_CACHE_DIR,
   });
 
   // Copy audio and video assets into the bundle so Remotion's server can serve them
@@ -135,18 +143,17 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
     serveUrl: bundled,
     id: COMPOSITION_ID,
     inputProps: props,
+    chromiumOptions: { gl: "angle" },
   });
 
   const actualConcurrency = await safeConcurrency(concurrency);
   log.info(`Rendering ${composition.durationInFrames} frames at ${composition.fps}fps`);
 
-  // Monitor RAM during render — abort if critically low
-  let abortController: AbortController | undefined;
-  try {
-    abortController = new AbortController();
-  } catch { /* AbortController not available in older Node */ }
+  // Monitor RAM during render — abort if critically low (Remotion requires makeCancelSignal)
+  const { cancel, cancelSignal } = makeCancelSignal();
+  let cancelled = false;
 
-  const stopMonitor = startRamMonitor(() => abortController?.abort());
+  const stopMonitor = startRamMonitor(() => { cancelled = true; cancel(); });
 
   try {
     await renderMedia({
@@ -156,7 +163,8 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
       outputLocation: outputPath,
       inputProps: props,
       concurrency: actualConcurrency,
-      cancelSignal: abortController?.signal,
+      cancelSignal,
+      chromiumOptions: { gl: "angle" },
       onProgress: ({ progress }: { progress: number }) => {
         const pct = Math.round(progress * 100);
         onProgress?.(pct);
@@ -164,7 +172,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
       },
     });
   } catch (err) {
-    if (abortController?.signal.aborted) {
+    if (cancelled) {
       throw new Error("Render aborted: RAM critically low. Close other apps and retry.");
     }
     throw err;
@@ -197,7 +205,11 @@ export async function renderVideoWithProps(options: {
   const startMs = Date.now();
 
   log.info("Bundling Remotion composition...");
-  const bundled = await bundle({ entryPoint: REMOTION_ROOT, onProgress: () => undefined });
+  const bundled = await bundle({
+    entryPoint: REMOTION_ROOT,
+    onProgress: () => undefined,
+    outDir: BUNDLE_CACHE_DIR,
+  });
 
   const absoluteProjectDir = path.resolve(projectDir);
   copyAssetsToBundle(absoluteProjectDir, bundled);
@@ -206,17 +218,16 @@ export async function renderVideoWithProps(options: {
     serveUrl: bundled,
     id: COMPOSITION_ID,
     inputProps,
+    chromiumOptions: { gl: "angle" },
   });
 
   const actualConcurrency = await safeConcurrency(concurrency);
   log.info(`Rendering ${composition.durationInFrames} frames at ${composition.fps}fps`);
 
-  let abortController: AbortController | undefined;
-  try {
-    abortController = new AbortController();
-  } catch { /* older Node fallback */ }
+  const { cancel: cancel2, cancelSignal: cancelSignal2 } = makeCancelSignal();
+  let cancelled2 = false;
 
-  const stopMonitor = startRamMonitor(() => abortController?.abort());
+  const stopMonitor = startRamMonitor(() => { cancelled2 = true; cancel2(); });
 
   try {
     await renderMedia({
@@ -226,7 +237,8 @@ export async function renderVideoWithProps(options: {
       outputLocation: outputPath,
       inputProps,
       concurrency: actualConcurrency,
-      cancelSignal: abortController?.signal,
+      cancelSignal: cancelSignal2,
+      chromiumOptions: { gl: "angle" },
       onProgress: ({ progress }: { progress: number }) => {
         const pct = Math.round(progress * 100);
         onProgress?.(pct);
@@ -234,7 +246,7 @@ export async function renderVideoWithProps(options: {
       },
     });
   } catch (err) {
-    if (abortController?.signal.aborted) {
+    if (cancelled2) {
       throw new Error("Render aborted: RAM critically low. Close other apps and retry.");
     }
     throw err;

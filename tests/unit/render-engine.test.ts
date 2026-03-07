@@ -16,6 +16,10 @@ vi.mock("@remotion/renderer", () => ({
     width: 1920,
     height: 1080,
   }),
+  makeCancelSignal: vi.fn(() => ({
+    cancel: vi.fn(),
+    cancelSignal: vi.fn(),
+  })),
 }));
 
 vi.mock("../../src/compositor/scene-timing-mapper.js", () => ({
