@@ -29,6 +29,8 @@ export async function injectScriptOverlay(
     overlay.id = "__vf_overlay";
     overlay.style.cssText = "position:fixed;top:16px;right:16px;z-index:999999;width:320px;padding:16px;border-radius:12px;background:rgba(0,0,0,0.85);color:#fff;font-family:system-ui,sans-serif;font-size:13px;line-height:1.5;box-shadow:0 4px 20px rgba(0,0,0,0.4);backdrop-filter:blur(8px);user-select:none;transition:opacity 0.3s;";
 
+    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
     function render() {
       var idx = window.__vf_current_step;
       if (idx >= steps.length) {
@@ -38,8 +40,8 @@ export async function injectScriptOverlay(
       var step = steps[idx];
       var next = idx + 1 < steps.length ? steps[idx + 1] : null;
       var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="color:#60a5fa;font-weight:600;">Step ' + step.step + '/' + steps.length + '</span><span style="color:#888;font-size:11px;">~' + step.expectedDurationSec + 's</span></div>';
-      html += '<div style="font-size:14px;font-weight:500;margin-bottom:10px;">' + step.instruction + '</div>';
-      if (next) html += '<div style="color:#888;font-size:12px;border-top:1px solid #333;padding-top:8px;">Next: ' + next.instruction + '</div>';
+      html += '<div style="font-size:14px;font-weight:500;margin-bottom:10px;">' + esc(step.instruction) + '</div>';
+      if (next) html += '<div style="color:#888;font-size:12px;border-top:1px solid #333;padding-top:8px;">Next: ' + esc(next.instruction) + '</div>';
       html += '<div style="margin-top:10px;color:#666;font-size:11px;"><kbd style="background:#333;padding:2px 6px;border-radius:4px;">Space</kbd> Next step <kbd style="background:#333;padding:2px 6px;border-radius:4px;margin-left:8px;">Esc</kbd> Stop</div>';
       overlay.innerHTML = html;
     }

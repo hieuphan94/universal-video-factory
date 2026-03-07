@@ -69,15 +69,11 @@ export async function runManualRecording(
   });
 
   // Inject click listener into page — runs in browser context (not Node)
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
-  await page.addInitScript(
-    /* istanbul ignore next */
-    new Function(`
-      document.addEventListener('click', function(e) {
-        window.__lastClick = { x: e.clientX, y: e.clientY, t: Date.now() };
-      }, true);
-    `) as () => void
-  );
+  await page.addInitScript(`
+    document.addEventListener('click', function(e) {
+      window.__lastClick = { x: e.clientX, y: e.clientY, t: Date.now() };
+    }, true);
+  `);
 
   console.log(`[manual-mode] Browser opened. Navigate to: ${url}`);
   await page.goto(url);
@@ -90,10 +86,7 @@ export async function runManualRecording(
   const pollInterval = setInterval(async () => {
     if (!polling) return;
     try {
-      const click = await page.evaluate(
-        // eslint-disable-next-line @typescript-eslint/no-implied-eval
-        new Function(`return window.__lastClick || null;`) as () => { x: number; y: number; t: number } | null
-      );
+      const click = await page.evaluate(`window.__lastClick || null`) as { x: number; y: number; t: number } | null;
       if (click && click.t > (actions[actions.length - 1]?.timestamp ?? 0)) {
         const shotName = `action-${String(++screenshotIndex).padStart(3, "0")}.png`;
         const screenshotPath = path.join(screenshotsDir, shotName);

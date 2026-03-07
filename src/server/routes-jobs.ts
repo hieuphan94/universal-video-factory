@@ -80,8 +80,12 @@ jobRoutes.get("/:id/logs", (c) => {
   const job = getJob(c.req.param("id"));
   if (!job) return c.json({ error: "Job not found" }, 404);
 
-  // Derive log file path from job working directory convention
+  // Derive log file path — prevent directory traversal
   const logPath = path.resolve("output", c.req.param("id"), "pipeline.log");
+  const outputBase = path.resolve("output");
+  if (!logPath.startsWith(outputBase)) {
+    return c.json({ error: "Invalid path" }, 403);
+  }
 
   if (!fs.existsSync(logPath)) {
     return c.json({ lines: [] });

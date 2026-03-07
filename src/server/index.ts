@@ -19,6 +19,19 @@ export function createServer(port = 3456) {
   // CORS for Vite dev server
   app.use("/api/*", cors({ origin: "http://localhost:5173" }));
 
+  // Optional auth — set VF_AUTH_TOKEN in .env.local to enable
+  const authToken = process.env.VF_AUTH_TOKEN;
+  if (authToken) {
+    app.use("/api/*", async (c, next) => {
+      const header = c.req.header("Authorization");
+      if (header !== `Bearer ${authToken}`) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+      await next();
+    });
+    console.log("[server] Auth enabled — VF_AUTH_TOKEN required for API access");
+  }
+
   // Initialize SQLite store
   initStore();
 
